@@ -6,7 +6,7 @@ ARG VERSION_ARG="0.0"
 ARG MESA_VERSION="25.0.7"
 ARG SPICE_VERSION="0.16.0"
 ARG VIRGL_VERSION="1.3.0"
-ARG VIRGL_REF="986b5fc57b07c06b5e0b3a3694d06898ebc80163"
+ARG VIRGL_REF="7fcfce49616974dc7050fdbfb5bb915f4448d270"
 ARG DEBIAN_SNAPSHOT="20260819T142328Z"
 ARG DEBIAN_FRONTEND="noninteractive"
 
@@ -93,13 +93,19 @@ RUN <<EOF_SOURCE
   git -C virglrenderer checkout --detach FETCH_HEAD
 EOF_SOURCE
 
-COPY patches/device-memory-budget.patch /tmp/
+COPY patches/device-memory-budget.patch \
+     patches/opaque-resource-import.patch \
+     /tmp/
 
 RUN <<'EOF_VIRGL_PATCHES'
   set -eu
 
-  git -C /src/virglrenderer apply --check /tmp/device-memory-budget.patch
-  git -C /src/virglrenderer apply /tmp/device-memory-budget.patch
+  git -C /src/virglrenderer apply --check \
+    /tmp/device-memory-budget.patch \
+    /tmp/opaque-resource-import.patch
+  git -C /src/virglrenderer apply \
+    /tmp/device-memory-budget.patch \
+    /tmp/opaque-resource-import.patch
   git -C /src/virglrenderer diff --check
 EOF_VIRGL_PATCHES
 
@@ -192,7 +198,7 @@ RUN <<'EOF_MESA'
 EOF_MESA
 
 # Build virglrenderer with both the normal VirGL renderer and Venus render-server
-# support. The Helios patches only affect the Venus/proxy paths; normal VirGL
+# support. The downstream patches only affect the Venus/proxy paths; normal VirGL
 # remains the default unless QEMU explicitly enables Venus.
 RUN <<'EOF_VIRGL'
   set -eu
@@ -242,7 +248,7 @@ RUN <<'EOF_VIRGL'
 
   # The memory-budget patch is compiled only into the Venus renderer path.
   if ! strings "$library" | grep -q 'VKR_DEVICE_MEMORY_LIMIT_BYTES'; then
-    echo "FAIL: Helios device-memory-budget patch is missing from virglrenderer."
+    echo "FAIL: device-memory-budget patch is missing from virglrenderer."
     exit 1
   fi
 
