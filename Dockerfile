@@ -14,6 +14,9 @@ ARG DEBIAN_SNAPSHOT="20260819T142328Z"
 RUN <<EOF_BUILD_DEPS
   set -eu
 
+  apt-get update
+  apt-get install --no-install-recommends -y ca-certificates
+
   cat > /etc/apt/sources.list.d/qemu-snapshot.list <<EOF_SOURCES
 deb [check-valid-until=no] https://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT}/ sid main
 deb-src [check-valid-until=no] https://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT}/ sid main
@@ -23,7 +26,6 @@ EOF_SOURCES
   apt-get build-dep --no-install-recommends -y -t sid qemu
   apt-get install --no-install-recommends -y -t sid \
     binutils \
-    ca-certificates \
     dpkg-dev \
     git \
     libdrm-dev \
