@@ -2,13 +2,15 @@
 
 FROM debian:trixie-slim AS builder
 
-ARG VERSION_ARG="0.0"
 ARG MESA_VERSION="25.0.7"
-ARG SPICE_VERSION="0.16.0"
 ARG VIRGL_VERSION="1.3.0"
+ARG SPICE_VERSION="0.16.0"
+
+ARG VERSION_ARG="0.0"
 ARG VIRGL_REF="7fcfce49616974dc7050fdbfb5bb915f4448d270"
-ARG DEBIAN_SNAPSHOT="20260819T142328Z"
+
 ARG DEBIAN_FRONTEND="noninteractive"
+ARG DEBIAN_SNAPSHOT="20260819T142328Z"
 
 RUN <<EOF_BUILD_DEPS
   set -eu
@@ -136,10 +138,10 @@ RUN <<'EOF_TOOLS'
   install -Dm755 /build-tools/src/compiler/spirv/vtn_bindgen /usr/local/bin/vtn_bindgen
 EOF_TOOLS
 
-# Build the Intel and AMD Gallium drivers needed for broad x86 GPU support.
-# LLVM is explicitly disabled in this runtime build; the shader compiler tools
-# built above are used only to generate the embedded Iris shader data. AMD uses
-# the LLVM-free r600 compiler and RadeonSI ACO compiler paths.
+# Build the Intel and AMD Gallium and hardware Vulkan drivers needed for broad
+# x86 GPU support. LLVM is explicitly disabled in this runtime build; the shader
+# compiler tools built above are used only at build time. AMD uses the LLVM-free
+# r600/RadeonSI compiler paths and RADV uses ACO.
 RUN <<'EOF_MESA'
   set -eu
 
@@ -166,6 +168,7 @@ RUN <<'EOF_MESA'
     -Dglvnd=enabled \
     -Dglx=disabled \
     -Dintel-elk=true \
+    -Dintel-rt=disabled \
     -Dlibunwind=disabled \
     -Dllvm=disabled \
     -Dlmsensors=disabled \
@@ -175,7 +178,7 @@ RUN <<'EOF_MESA'
     -Dshared-glapi=enabled \
     -Dvalgrind=disabled \
     -Dvideo-codecs=[] \
-    -Dvulkan-drivers=[] \
+    -Dvulkan-drivers=intel,intel_hasvk,amd \
     -Dvulkan-layers=[]
 
   meson compile -C /build-mesa
@@ -187,6 +190,21 @@ RUN <<'EOF_MESA'
     /mesa/usr/share/doc \
     /mesa/usr/share/man \
     /mesa/usr/share/pkgconfig
+
+  for library in libvulkan_intel.so libvulkan_intel_hasvk.so libvulkan_radeon.so; do
+    if [ ! -f "/mesa/usr/lib/${multiarch}/${library}" ]; then
+      echo "FAIL: expected Vulkan driver was not produced: ${library}"
+      exit 1
+    fi
+  done
+
+  for manifest in intel_icd intel_hasvk_icd radeon_icd; do
+    if ! find /mesa/usr/share/vulkan/icd.d -maxdepth 1 -type f \
+         -name "${manifest}*.json" -print -quit | grep -q .; then
+      echo "FAIL: expected Vulkan ICD manifest was not produced: ${manifest}"
+      exit 1
+    fi
+  done
 
   find /mesa -type f -exec sh -c '
     for file do
@@ -370,7 +388,7 @@ RUN <<EOF_PACKAGE
         echo "$owner" >> /tmp/depends
       done
 
-  printf '%s\n' libegl1 libopengl0 >> /tmp/depends
+  printf '%s\n' libegl1 libopengl0 libvulkan1 >> /tmp/depends
 
   sort -u /tmp/depends -o /tmp/depends
   depends="$(paste -sd, /tmp/depends | sed 's/,/, /g')"
@@ -384,16 +402,17 @@ Priority: optional
 Architecture: amd64
 Maintainer: qemus <qemus@users.noreply.github.com>
 Depends: ${depends}
-Provides: libgbm1 (= ${MESA_VERSION}), libegl-mesa0 (= ${MESA_VERSION}), libspice-server1 (= ${SPICE_VERSION}), libvirglrenderer1 (= ${VIRGL_VERSION})
-Conflicts: libgbm1, libegl-mesa0, libspice-server1, libvirglrenderer1, virgl-server
-Replaces: libgbm1, libegl-mesa0, libspice-server1, libvirglrenderer1, virgl-server
+Provides: libgbm1 (= ${MESA_VERSION}), libegl-mesa0 (= ${MESA_VERSION}), libspice-server1 (= ${SPICE_VERSION}), libvirglrenderer1 (= ${VIRGL_VERSION}), vulkan-icd
+Conflicts: libgbm1, libegl-mesa0, libspice-server1, libvirglrenderer1, mesa-vulkan-drivers, virgl-server
+Replaces: libgbm1, libegl-mesa0, libspice-server1, libvirglrenderer1, mesa-vulkan-drivers, virgl-server
 Installed-Size: ${installed_size}
 Homepage: https://github.com/qemus/qemu-render
 Description: Minimal graphics runtime for QEMU
- Provides an Intel and AMD Mesa runtime supporting i915, Crocus, Iris, r600 and
- RadeonSI together with EGL and GBM, a minimal SPICE server runtime for QXL, and
- a VirGL/Venus renderer with the Venus render server and device-memory budgeting,
- without LLVM, GStreamer, Opus, SASL, smartcard or optional compression runtimes.
+ Provides an Intel and AMD Mesa runtime supporting i915, Crocus, Iris, r600,
+ RadeonSI, ANV, HasVK and RADV together with EGL, GBM and Vulkan, a minimal SPICE
+ server runtime for QXL, and a VirGL/Venus renderer with the Venus render server
+ and device-memory budgeting, without LLVM, GStreamer, Opus, SASL, smartcard or
+ optional compression runtimes.
 EOF_CONTROL
 
   echo
@@ -506,7 +525,7 @@ RUN <<EOF_VERIFY
   echo "Package isolation"
   echo "================================================================"
 
-  for package in libgbm1 libegl-mesa0 libspice-server1 libvirglrenderer1 virgl-server mesa-libgallium; do
+  for package in libgbm1 libegl-mesa0 libspice-server1 libvirglrenderer1 mesa-vulkan-drivers virgl-server mesa-libgallium; do
     if dpkg-query -W -f='${Status}\n' "$package" 2>/dev/null | grep -q '^install ok installed$'; then
       echo "FAIL: unwanted stock package was installed: $package"
       exit 1
@@ -519,14 +538,14 @@ RUN <<EOF_VERIFY
     exit 1
   fi
 
-  echo "PASS: stock Mesa/SPICE/virglrenderer providers and LLVM are absent."
+  echo "PASS: stock Mesa/Vulkan/SPICE/virglrenderer providers and LLVM are absent."
 
   echo
   echo "================================================================"
   echo "Runtime loader availability"
   echo "================================================================"
 
-  for library in libEGL.so.1 libOpenGL.so.0 libspice-server.so.1 libvirglrenderer.so.1; do
+  for library in libEGL.so.1 libOpenGL.so.0 libvulkan.so.1 libspice-server.so.1 libvirglrenderer.so.1; do
     if ! ldconfig -p | grep -q "$library"; then
       echo "FAIL: required runtime library is missing: $library"
       exit 1
@@ -539,6 +558,24 @@ RUN <<EOF_VERIFY
     exit 1
   fi
   echo "PASS: virgl_render_server is available."
+
+  for library in libvulkan_intel.so libvulkan_intel_hasvk.so libvulkan_radeon.so; do
+    path="$(dpkg-query -L qemu-render | grep "/${library}$" | head -n 1)"
+    if [ -z "$path" ] || [ ! -f "$path" ]; then
+      echo "FAIL: Vulkan driver is missing from qemu-render: $library"
+      exit 1
+    fi
+    echo "PASS: Vulkan driver is available: $library"
+  done
+
+  for manifest in intel_icd intel_hasvk_icd radeon_icd; do
+    path="$(dpkg-query -L qemu-render | grep "/vulkan/icd.d/${manifest}.*\.json$" | head -n 1)"
+    if [ -z "$path" ] || [ ! -f "$path" ]; then
+      echo "FAIL: Vulkan ICD manifest is missing from qemu-render: $manifest"
+      exit 1
+    fi
+    echo "PASS: Vulkan ICD manifest is available: $manifest"
+  done
 
   virgl_library="$(dpkg-query -L qemu-render | grep '/libvirglrenderer.so.1$' | head -n 1)"
   if [ -z "$virgl_library" ] || [ ! -e "$virgl_library" ]; then
@@ -687,6 +724,7 @@ RUN <<EOF_VERIFY
     qemu-system-modules-spice \
     libegl1 \
     libopengl0 \
+    libvulkan1 \
     libglvnd0
 EOF_VERIFY
 
