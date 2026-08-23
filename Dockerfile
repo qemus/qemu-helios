@@ -5,6 +5,8 @@ FROM debian:trixie-slim AS builder
 ARG VERSION_ARG="0.0"
 ARG MESA_VERSION="25.0.7"
 ARG SPICE_VERSION="0.16.0"
+ARG VIRGL_VERSION="1.3.0"
+ARG VIRGL_REF="986b5fc57b07c06b5e0b3a3694d06898ebc80163"
 ARG DEBIAN_SNAPSHOT="20260819T142328Z"
 ARG DEBIAN_FRONTEND="noninteractive"
 
@@ -25,23 +27,29 @@ EOF_SOURCES
   apt-get update
   apt-get build-dep -y mesa
 
-  # Install the normal SPICE build dependencies from Trixie as well.
+  # Install the normal SPICE and virglrenderer build dependencies from Trixie as well.
   apt-get install --no-install-recommends -y \
     binutils \
     bzip2 \
     curl \
     dpkg-dev \
     file \
+    git \
     gzip \
+    libdrm-dev \
+    libepoxy-dev \
+    libgbm-dev \
     libglib2.0-dev \
     libjpeg-dev \
     libpixman-1-dev \
     libssl-dev \
+    libvulkan-dev \
     meson \
     ninja-build \
     pkg-config \
     python3-pyparsing \
     python3-six \
+    python3-yaml \
     xz-utils \
     zlib1g-dev
 
@@ -78,7 +86,22 @@ RUN <<EOF_SOURCE
   mkdir spice
   tar -xf spice.tar.bz2 -C spice --strip-components=1
   rm -f spice.tar.bz2
+
+  git init virglrenderer
+  git -C virglrenderer remote add origin https://gitlab.freedesktop.org/virgl/virglrenderer.git
+  git -C virglrenderer fetch --depth=1 origin "${VIRGL_REF}"
+  git -C virglrenderer checkout --detach FETCH_HEAD
 EOF_SOURCE
+
+COPY patches/device-memory-budget.patch /tmp/
+
+RUN <<'EOF_VIRGL_PATCHES'
+  set -eu
+
+  git -C /src/virglrenderer apply --check /tmp/device-memory-budget.patch
+  git -C /src/virglrenderer apply /tmp/device-memory-budget.patch
+  git -C /src/virglrenderer diff --check
+EOF_VIRGL_PATCHES
 
 # Build Mesa's shader compiler tools with LLVM available. These tools are used
 # only while compiling the final runtime drivers and are never packaged.
@@ -168,6 +191,70 @@ RUN <<'EOF_MESA'
   ' sh {} +
 EOF_MESA
 
+# Build virglrenderer with both the normal VirGL renderer and Venus render-server
+# support. The Helios patches only affect the Venus/proxy paths; normal VirGL
+# remains the default unless QEMU explicitly enables Venus.
+RUN <<'EOF_VIRGL'
+  set -eu
+
+  multiarch="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
+
+  meson setup /build-virgl /src/virglrenderer \
+    --buildtype=release \
+    --prefix=/usr \
+    --libdir="lib/${multiarch}" \
+    --libexecdir=libexec \
+    -Dplatforms=egl \
+    -Dvenus=true \
+    -Drender-server-worker=thread \
+    -Dunstable-apis=true \
+    -Dtests=false \
+    -Dvideo=false
+
+  meson compile -C /build-virgl
+  meson install -C /build-virgl --destdir /virgl
+
+  rm -rf \
+    /virgl/usr/bin \
+    /virgl/usr/include \
+    /virgl/usr/lib/*/pkgconfig \
+    /virgl/usr/share
+
+  # Keep only the runtime SONAME links/objects and the Venus render server.
+  rm -f /virgl/usr/lib/*/libvirglrenderer.so
+
+  library=$(find /virgl/usr/lib -type f -name 'libvirglrenderer.so.1.*' -print -quit)
+  if [ -z "$library" ]; then
+    echo "FAIL: libvirglrenderer runtime was not produced."
+    exit 1
+  fi
+
+  if ! readelf -d "$library" | grep -q 'SONAME.*libvirglrenderer.so.1'; then
+    echo "FAIL: unexpected virglrenderer SONAME."
+    readelf -d "$library"
+    exit 1
+  fi
+
+  if [ ! -x /virgl/usr/libexec/virgl_render_server ]; then
+    echo "FAIL: virgl_render_server was not produced."
+    exit 1
+  fi
+
+  # The memory-budget patch is compiled only into the Venus renderer path.
+  if ! strings "$library" | grep -q 'VKR_DEVICE_MEMORY_LIMIT_BYTES'; then
+    echo "FAIL: Helios device-memory-budget patch is missing from virglrenderer."
+    exit 1
+  fi
+
+  find /virgl -type f -exec sh -c '
+    for file do
+      if file "$file" | grep -q "ELF"; then
+        strip --strip-unneeded "$file"
+      fi
+    done
+  ' sh {} +
+EOF_VIRGL
+
 # Build a SPICE server runtime for QEMU QXL without the optional multimedia,
 # authentication, smartcard and extra compression stacks. QEMU's own SPICE
 # modules remain supplied by Debian so their module stamps stay synchronized
@@ -224,9 +311,9 @@ RUN <<'EOF_SPICE'
   ' sh {} +
 EOF_SPICE
 
-# Package the minimal Mesa and SPICE runtimes together. The package replaces
-# only their heavy Debian runtime providers; version-matched QEMU modules are
-# deliberately not included.
+# Package the minimal Mesa, SPICE and virglrenderer runtimes together. The
+# package replaces their Debian runtime providers; version-matched QEMU modules
+# are deliberately not included.
 RUN <<EOF_PACKAGE
   set -eu
 
@@ -236,10 +323,12 @@ RUN <<EOF_PACKAGE
   mkdir -p /package/DEBIAN
   cp -a /mesa/. /package/
   cp -a /spice/. /package/
+  cp -a /virgl/. /package/
 
-  mkdir -p /package/usr/share/doc/qemu-minimal
-  cp /src/mesa/docs/license.rst /package/usr/share/doc/qemu-minimal/copyright.Mesa
-  cp /src/spice/COPYING /package/usr/share/doc/qemu-minimal/copyright.SPICE
+  mkdir -p /package/usr/share/doc/qemu-render
+  cp /src/mesa/docs/license.rst /package/usr/share/doc/qemu-render/copyright.Mesa
+  cp /src/spice/COPYING /package/usr/share/doc/qemu-render/copyright.SPICE
+  cp /src/virglrenderer/COPYING /package/usr/share/doc/qemu-render/copyright.virglrenderer
 
   # Add the Debian packages required by the custom runtimes. Libraries shipped
   # inside this package are intentionally excluded.
@@ -282,21 +371,22 @@ RUN <<EOF_PACKAGE
   installed_size="$(du -sk /package/usr | cut -f1)"
 
   cat > /package/DEBIAN/control <<EOF_CONTROL
-Package: qemu-minimal
+Package: qemu-render
 Version: ${VERSION_ARG}
 Section: libs
 Priority: optional
 Architecture: amd64
 Maintainer: qemus <qemus@users.noreply.github.com>
 Depends: ${depends}
-Provides: libgbm1 (= ${MESA_VERSION}), libegl-mesa0 (= ${MESA_VERSION}), libspice-server1 (= ${SPICE_VERSION})
-Conflicts: libgbm1, libegl-mesa0, libspice-server1
-Replaces: libgbm1, libegl-mesa0, libspice-server1
+Provides: libgbm1 (= ${MESA_VERSION}), libegl-mesa0 (= ${MESA_VERSION}), libspice-server1 (= ${SPICE_VERSION}), libvirglrenderer1 (= ${VIRGL_VERSION})
+Conflicts: libgbm1, libegl-mesa0, libspice-server1, libvirglrenderer1, virgl-server
+Replaces: libgbm1, libegl-mesa0, libspice-server1, libvirglrenderer1, virgl-server
 Installed-Size: ${installed_size}
-Homepage: https://github.com/qemus/qemu-minimal
+Homepage: https://github.com/qemus/qemu-render
 Description: Minimal graphics runtime for QEMU
  Provides an Intel and AMD Mesa runtime supporting i915, Crocus, Iris, r600 and
- RadeonSI together with EGL and GBM, plus a minimal SPICE server runtime for QXL,
+ RadeonSI together with EGL and GBM, a minimal SPICE server runtime for QXL, and
+ a VirGL/Venus renderer with the Venus render server and device-memory budgeting,
  without LLVM, GStreamer, Opus, SASL, smartcard or optional compression runtimes.
 EOF_CONTROL
 
@@ -342,7 +432,7 @@ EOF_CONTROL
   echo "================================================================"
   echo "Package size diagnostics"
   echo "================================================================"
-  du -sh /mesa /spice /package
+  du -sh /mesa /spice /virgl /package
 
   echo
   echo "Largest packaged files:"
@@ -353,9 +443,9 @@ EOF_CONTROL
     --root-owner-group \
     --build \
     /package \
-    "/dist/qemu-minimal_${VERSION_ARG}_amd64.deb"
+    "/dist/qemu-render_${VERSION_ARG}_amd64.deb"
 
-  package="/dist/qemu-minimal_${VERSION_ARG}_amd64.deb"
+  package="/dist/qemu-render_${VERSION_ARG}_amd64.deb"
   size="$(stat -c %s "$package")"
 
   echo
@@ -385,7 +475,7 @@ COPY --from=builder /dist/ /dist/
 
 # Install the finished package with Debian's official version-matched QEMU
 # OpenGL and SPICE modules. This proves the custom runtime satisfies both
-# dependency chains without embedding QEMU modules in qemu-minimal itself.
+# dependency chains without embedding QEMU modules in qemu-render itself.
 RUN <<EOF_VERIFY
   set -eu
 
@@ -400,7 +490,7 @@ RUN <<EOF_VERIFY
 
   apt-get update
   apt-get --no-install-recommends -y -t sid install \
-    "/dist/qemu-minimal_${VERSION_ARG}_amd64.deb" \
+    "/dist/qemu-render_${VERSION_ARG}_amd64.deb" \
     "qemu-system-x86=${VERSION_QEMU}" \
     "qemu-system-modules-opengl=${VERSION_QEMU}" \
     "qemu-system-modules-spice=${VERSION_QEMU}"
@@ -410,7 +500,7 @@ RUN <<EOF_VERIFY
   echo "Package isolation"
   echo "================================================================"
 
-  for package in libgbm1 libegl-mesa0 libspice-server1 mesa-libgallium; do
+  for package in libgbm1 libegl-mesa0 libspice-server1 libvirglrenderer1 virgl-server mesa-libgallium; do
     if dpkg-query -W -f='${Status}\n' "$package" 2>/dev/null | grep -q '^install ok installed$'; then
       echo "FAIL: unwanted stock package was installed: $package"
       exit 1
@@ -423,20 +513,48 @@ RUN <<EOF_VERIFY
     exit 1
   fi
 
-  echo "PASS: stock Mesa/SPICE providers and LLVM are absent."
+  echo "PASS: stock Mesa/SPICE/virglrenderer providers and LLVM are absent."
 
   echo
   echo "================================================================"
   echo "Runtime loader availability"
   echo "================================================================"
 
-  for library in libEGL.so.1 libOpenGL.so.0 libspice-server.so.1; do
+  for library in libEGL.so.1 libOpenGL.so.0 libspice-server.so.1 libvirglrenderer.so.1; do
     if ! ldconfig -p | grep -q "$library"; then
       echo "FAIL: required runtime library is missing: $library"
       exit 1
     fi
     echo "PASS: $library is available."
   done
+
+  if [ ! -x /usr/libexec/virgl_render_server ]; then
+    echo "FAIL: virgl_render_server is missing from qemu-render."
+    exit 1
+  fi
+  echo "PASS: virgl_render_server is available."
+
+  virgl_library="$(dpkg-query -L qemu-render | grep '/libvirglrenderer.so.1$' | head -n 1)"
+  if [ -z "$virgl_library" ] || [ ! -e "$virgl_library" ]; then
+    echo "FAIL: qemu-render does not own the libvirglrenderer SONAME link."
+    exit 1
+  fi
+  echo "PASS: custom virglrenderer is owned by qemu-render: $virgl_library"
+
+  opengl_module="$(dpkg-query -L qemu-system-modules-opengl | grep '/hw-display-virtio-gpu-gl.so$' | head -n 1)"
+  if [ -z "$opengl_module" ]; then
+    echo "FAIL: QEMU virtio-gpu OpenGL module was not found."
+    exit 1
+  fi
+
+  resolved_virgl="$(ldd "$opengl_module" | awk '/libvirglrenderer\.so\.1 =>/ { print $3; exit }')"
+  if [ -z "$resolved_virgl" ] || \
+     [ "$(readlink -f "$resolved_virgl")" != "$(readlink -f "$virgl_library")" ]; then
+    ldd "$opengl_module"
+    echo "FAIL: QEMU OpenGL module is not resolving to qemu-render virglrenderer."
+    exit 1
+  fi
+  echo "PASS: QEMU OpenGL module resolves to the custom virglrenderer."
 
   echo
   echo "================================================================"
@@ -447,7 +565,7 @@ RUN <<EOF_VERIFY
   llvm_transitive=0
   spice_optional=0
 
-  for package in qemu-minimal qemu-system-modules-opengl qemu-system-modules-spice; do
+  for package in qemu-render qemu-system-modules-opengl qemu-system-modules-spice; do
     for file in $(dpkg-query -L "$package"); do
       [ -f "$file" ] || continue
       file "$file" | grep -q "ELF" || continue
@@ -497,7 +615,21 @@ RUN <<EOF_VERIFY
 
   echo
   echo "================================================================"
-  echo "Test 3: QXL module loading"
+  echo "Test 3: virtio-gpu OpenGL module loading"
+  echo "================================================================"
+
+  if ! qemu-system-x86_64 -device virtio-vga-gl,help >/tmp/virtio-vga-gl-help 2>&1; then
+    cat /tmp/virtio-vga-gl-help
+    echo "FAIL: QEMU could not load the virtio-vga-gl device module."
+    exit 1
+  fi
+
+  cat /tmp/virtio-vga-gl-help
+  echo "PASS: virtio-vga-gl device module loaded with the custom virglrenderer."
+
+  echo
+  echo "================================================================"
+  echo "Test 4: QXL module loading"
   echo "================================================================"
 
   if ! qemu-system-x86_64 -device qxl-vga,help >/tmp/qxl-help 2>&1; then
@@ -511,7 +643,7 @@ RUN <<EOF_VERIFY
 
   echo
   echo "================================================================"
-  echo "Test 4: QXL with the VNC display path"
+  echo "Test 5: QXL with the VNC display path"
   echo "================================================================"
 
   set +e
@@ -542,12 +674,11 @@ RUN <<EOF_VERIFY
   echo "================================================================"
   dpkg-query -W \
     -f='${binary:Package}\t${Version}\n' \
-    qemu-minimal \
+    qemu-render \
     qemu-system-x86 \
     qemu-system-common \
     qemu-system-modules-opengl \
     qemu-system-modules-spice \
-    libvirglrenderer1 \
     libegl1 \
     libopengl0 \
     libglvnd0
