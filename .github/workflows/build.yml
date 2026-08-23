@@ -55,7 +55,7 @@ jobs:
         name: Increment version variable
         uses: action-pack/increment@v2
         with:
-          name: 'MAJOR'
+          name: 'MINOR'
           token: ${{ secrets.REPO_ACCESS_TOKEN }}
       -
         name: Send mail
