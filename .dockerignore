@@ -1,4 +1,6 @@
-* 
-
-!Dockerfile
-!.dockerignore
+.git/
+.github/
+dist/
+*.deb
+*.log
+.DS_Store
