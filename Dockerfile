@@ -132,12 +132,12 @@ RUN <<'EOF_BUILD'
 
   ninja qemu-system-x86_64
 
-  install -Dm755 /build/qemu-system-x86_64 /out/qemu-system-x86_64-helios
-  strip --strip-unneeded /out/qemu-system-x86_64-helios
+  install -Dm755 /build/qemu-system-x86_64 /out/qemu-system-x86_64
+  strip --strip-unneeded /out/qemu-system-x86_64
 
   # This symbol is referenced only when the extended virglrenderer metadata API
   # was visible at compile time; without it native Helios scanout is incomplete.
-  readelf -Ws /out/qemu-system-x86_64-helios \
+  readelf -Ws /out/qemu-system-x86_64 \
     | grep -Fq 'virgl_renderer_resource_get_info_ext' || {
       echo "FAIL: virglrenderer extended resource metadata support was not compiled in."
       exit 1
@@ -148,7 +148,7 @@ RUN <<'EOF_BUILD'
     helios_scanout_read \
     helios_vulkan_capture \
     helios_vulkan_publish; do
-    strings /out/qemu-system-x86_64-helios | grep -Fq "$marker" || {
+    strings /out/qemu-system-x86_64 | grep -Fq "$marker" || {
       echo "FAIL: Helios marker is missing from the binary: $marker"
       exit 1
     }
@@ -160,12 +160,12 @@ EOF_BUILD
 # artifact is published.
 FROM qemux/qemu:latest AS verify
 
-COPY --from=builder /out/qemu-system-x86_64-helios /tmp/qemu-system-x86_64-helios
+COPY --from=builder /out/qemu-system-x86_64 /tmp/qemu-system-x86_64
 
 RUN <<'EOF_VERIFY'
   set -eu
 
-  binary=/tmp/qemu-system-x86_64-helios
+  binary=/tmp/qemu-system-x86_64
 
   deps="$(ldd "$binary" 2>&1)"
   printf '%s\n' "$deps"
@@ -189,11 +189,11 @@ RUN <<'EOF_VERIFY'
   QEMU_MODULE_DIR=/nonexistent LD_BIND_NOW=1 \
     "$binary" -device qxl-vga,help >/tmp/qxl-help 2>&1
 
-  install -Dm755 "$binary" /out/qemu-system-x86_64-helios
+  install -Dm755 "$binary" /out/qemu-system-x86_64
   install -Dm644 /tmp/COPYING /out/COPYING
 
-  size="$(stat -c %s /out/qemu-system-x86_64-helios)"
-  echo "Verified qemu-system-x86_64-helios (${size} bytes)"
+  size="$(stat -c %s /out/qemu-system-x86_64)"
+  echo "Verified qemu-system-x86_64 (${size} bytes)"
 EOF_VERIFY
 
 FROM scratch AS artifact
@@ -204,4 +204,4 @@ LABEL org.opencontainers.image.title="Helios" \
       org.opencontainers.image.description="QEMU build with patches for accelerated Windows graphics." \
       org.opencontainers.image.version="${VERSION_ARG}"
 
-COPY --from=verify /out/qemu-system-x86_64-helios /usr/bin/qemu-system-x86_64
+COPY --from=verify /out/qemu-system-x86_64 /usr/bin/qemu-system-x86_64
