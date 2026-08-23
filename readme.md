@@ -15,9 +15,7 @@ Helios is a paravirtualized graphics stack that allows a Windows virtual machine
 
 Traditional GPU passthrough gives the Windows guest direct ownership of a physical GPU. The normal vendor driver is then installed inside Windows and applications interact with essentially the same GPU stack they would use on bare metal. This provides excellent compatibility, but the GPU generally becomes dedicated to that VM while it is running.
 
-Helios takes a very different approach.
-
-Instead of exposing the physical GPU itself, QEMU presents a `virtio-gpu` device to the guest. Graphics commands are translated into Vulkan and transported through the virtual device to the Linux host, where they are executed by the host's normal Vulkan driver on the real GPU.
+Helios takes a very different approach, instead of exposing the physical GPU itself, QEMU presents a `virtio-gpu` device to the guest. Graphics commands are translated into Vulkan and transported through the virtual device to the Linux host, where they are executed by the host's normal Vulkan driver on the real GPU.
 
 The physical GPU therefore remains owned by Linux and can continue to be shared with the host and other workloads.
 
@@ -56,13 +54,9 @@ QEMU has supported accelerated `virtio-gpu` graphics for Linux guests for years.
 
 Linux already contains the `virtio_gpu` kernel driver, while Mesa provides the userspace graphics drivers required to make use of it. A Linux guest can therefore use VirGL for OpenGL or Venus for Vulkan and send rendering commands through QEMU to the host GPU.
 
-Windows does not normally have an equivalent accelerated `virtio-gpu` stack.
+Windows does not normally have an equivalent accelerated `virtio-gpu` stack. The standard Windows `virtio-gpu` driver can provide a framebuffer and display output, but that alone does not provide a complete accelerated 3D graphics stack comparable to what Linux guests have.
 
-The standard Windows `virtio-gpu` driver can provide a framebuffer and display output, but that alone does not provide a complete accelerated 3D graphics stack comparable to what Linux guests have.
-
-Helios fills that gap.
-
-The modern Helios architecture implements a Windows WDDM render and display adapter around `virtio-gpu`. Windows therefore sees Helios as an actual graphics adapter and can use it for desktop composition and application rendering, while the expensive GPU work is forwarded to the host instead of being executed by a software renderer inside the VM.
+Helios fills that gap and implements a Windows WDDM render and display adapter around `virtio-gpu`. Windows therefore sees Helios as an actual graphics adapter and can use it for desktop composition and application rendering, while the expensive GPU work is forwarded to the host instead of being executed by a software renderer inside the VM.
 
 This avoids two undesirable alternatives:
 
@@ -115,9 +109,7 @@ Host Vulkan driver
 GPU
 ```
 
-The Windows kernel-mode driver does not need to understand or emulate the instruction set of a particular Intel, AMD, or NVIDIA GPU. The guest produces Venus command streams and the host graphics stack handles the real hardware.
-
-This is what makes the approach largely independent of the physical GPU vendor.
+The Windows kernel-mode driver does not need to understand or emulate the instruction set of a particular Intel, AMD, or NVIDIA GPU. The guest produces Venus command streams and the host graphics stack handles the real hardware. This is what makes the approach largely independent of the physical GPU vendor.
 
 ### GPU memory
 
@@ -179,9 +171,7 @@ pixel rows
 
 Given an offset, stride, width and height, QEMU can calculate where every pixel resides.
 
-Modern Vulkan images do not necessarily work like this.
-
-For performance reasons a GPU normally stores render targets using an implementation-specific **optimal tiling** layout:
+Modern Vulkan images do not necessarily work like this. For performance reasons a GPU normally stores render targets using an implementation-specific **optimal tiling** layout:
 
 ```text
 VK_IMAGE_TILING_OPTIMAL
@@ -287,9 +277,7 @@ The advantage is that the same physical GPU can remain available to Linux while 
 
 ## What this repository provides 📦
 
-This repository does **not** contain the complete Helios Windows graphics driver.
-
-It provides the custom **host-side QEMU binary** required by the Helios graphics stack.
+This repository does **not** contain the complete Helios Windows graphics driver. It provides the custom **host-side QEMU binary** required by the Helios graphics stack.
 
 The Windows driver, Mesa Venus ICD, DXVK integration and other guest-side components live separately. This project only maintains the QEMU changes required to make the resulting `virtio-gpu` resources work correctly with the host display stack.
 
@@ -350,7 +338,7 @@ Improves VNC's handling of rapidly changing lossy regions by coalescing damage m
 
 ## Acknowledgements 🙏
 
-Special thanks to the [WinBoat](https://github.com/winboat-org/winboat) team, this project would not exist without their invaluable work.
+Special thanks to [TibixDev](https://github.com/TibixDev) and the [WinBoat](https://github.com/winboat-org/winboat) team, this project would not exist without their invaluable work.
 
 [build_url]: https://github.com/qemus/qemu-helios/
 [release_url]: https://github.com/qemus/qemu-helios/releases/
