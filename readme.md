@@ -75,7 +75,7 @@ Helios sits between those two approaches: the guest receives accelerated graphic
 
 The core transport used by Helios is **Venus**, Mesa's virtual Vulkan implementation.
 
-Venus serializes Vulkan operations in the guest and sends them through virtio-gpu. On the host, virglrenderer decodes those commands and submits equivalent work to the native Vulkan driver.
+Venus serializes Vulkan operations in the guest and sends them through `virtio-gpu`. On the host, `virglrenderer` decodes those commands and submits equivalent work to the native Vulkan driver.
 
 For Direct3D workloads, Helios uses the same principle by translating Direct3D into Vulkan before it enters the Venus transport.
 
@@ -123,9 +123,9 @@ This is what makes the approach largely independent of the physical GPU vendor.
 
 Sending every texture, vertex buffer and rendered frame through an emulated device one byte at a time would be far too expensive.
 
-virtio-gpu therefore supports **blob resources** and host-visible memory.
+`virtio-gpu` therefore supports **blob resources** and host-visible memory.
 
-Large graphics allocations can be backed by host resources and exposed to the guest through the virtio-gpu host-memory PCI region. The guest can map those resources instead of repeatedly copying their contents through the control queue.
+Large graphics allocations can be backed by host resources and exposed to the guest through the `virtio-gpu` host-memory PCI region. The guest can map those resources instead of repeatedly copying their contents through the control queue.
 
 The command stream tells the host GPU what to do, while large resource data can remain in shared or host-visible allocations.
 
@@ -135,7 +135,7 @@ This distinction is important: Venus primarily transports **commands and synchro
 
 Rendering a frame and displaying that frame are separate problems.
 
-Current Helios is both a WDDM render adapter and a display adapter. Windows' Desktop Window Manager can compose the desktop directly on the Helios adapter, and the resulting primary surface becomes a virtio-gpu scanout resource.
+Current Helios is both a WDDM render adapter and a display adapter. Windows' Desktop Window Manager can compose the desktop directly on the Helios adapter, and the resulting primary surface becomes a `virtio-gpu` scanout resource.
 
 The presentation path is roughly:
 
@@ -245,9 +245,9 @@ DMA-BUF
         QEMU display surface
 ```
 
-This does **not** introduce a new guest-facing virtio-gpu protocol.
+This does **not** introduce a new guest-facing `virtio-gpu` protocol.
 
-Helios continues to use the normal virtio-gpu blob, scanout and resource-flush commands. The additional logic is on the host side and teaches QEMU how to correctly display resources whose native layout the normal scanout implementation cannot represent.
+Helios continues to use the normal `virtio-gpu` blob, scanout and resource-flush commands. The additional logic is on the host side and teaches QEMU how to correctly display resources whose native layout the normal scanout implementation cannot represent.
 
 ## Why not just use GPU passthrough? 🔀
 
