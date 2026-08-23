@@ -24,6 +24,7 @@ EOF_SOURCES
   apt-get install --no-install-recommends -y -t sid \
     binutils \
     ca-certificates \
+    dpkg-dev \
     git \
     libdrm-dev \
     libepoxy-dev \
@@ -111,24 +112,92 @@ RUN <<'EOF_BUILD'
   multiarch="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
   export PKG_CONFIG_PATH="/usr/local/lib/${multiarch}/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
   export LD_LIBRARY_PATH="/usr/local/lib/${multiarch}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+  export DEB_CFLAGS_MAINT_APPEND="-ffile-prefix-map=/src/qemu=."
+
+  extra_cflags="$(dpkg-buildflags --get CFLAGS) $(dpkg-buildflags --get CPPFLAGS)"
+  extra_ldflags="$(dpkg-buildflags --get LDFLAGS)"
+
+  printf 'Debian CFLAGS/CPPFLAGS: %s\n' "$extra_cflags"
+  printf 'Debian LDFLAGS: %s\n' "$extra_ldflags"
 
   /src/qemu/configure \
+    --with-pkgversion="Helios ${VERSION_ARG}" \
     --target-list=x86_64-softmmu \
     --prefix=/usr \
     --libdir="/usr/lib/${multiarch}" \
+    --libexecdir=/usr/lib/qemu \
     --sysconfdir=/etc \
     --localstatedir=/var \
+    --mandir=/usr/share/man \
+    --firmwarepath=/usr/share/qemu:/usr/share/seabios \
+    --extra-cflags="$extra_cflags" \
+    --extra-ldflags="$extra_ldflags" \
+    --audio-drv-list=pipewire,pa,alsa,jack,oss,sdl \
+    --disable-containers \
     --disable-docs \
+    --disable-download \
     --disable-gtk \
+    --disable-install-blobs \
+    --disable-linux-user \
     --disable-modules \
-    --disable-sdl \
+    --disable-relocatable \
+    --disable-sndio \
+    --disable-strip \
+    --disable-user \
+    --disable-vte \
+    --disable-xkbcommon \
+    --disable-xen \
+    --enable-system \
+    --enable-attr \
+    --enable-blkio \
+    --enable-bpf \
+    --enable-brlapi \
+    --enable-bzip2 \
+    --enable-cap-ng \
+    --enable-capstone \
+    --enable-curl \
+    --enable-curses \
+    --enable-fdt \
+    --enable-fuse \
+    --enable-gnutls \
     --enable-kvm \
+    --enable-libiscsi \
+    --enable-libnfs \
+    --enable-libpmem \
+    --enable-libssh \
+    --enable-libusb \
+    --enable-libudev \
+    --enable-linux-aio \
+    --enable-linux-io-uring \
+    --enable-nettle \
+    --enable-numa \
     --enable-opengl \
+    --enable-pixman \
+    --enable-png \
+    --enable-rbd \
+    --enable-rdma \
+    --enable-sdl \
+    --enable-seccomp \
+    --enable-slirp \
+    --enable-smartcard \
     --enable-spice \
+    --enable-tcg \
+    --enable-usb-redir \
+    --enable-vde \
+    --enable-vhost-net \
+    --enable-vhost-user \
+    --enable-vhost-vdpa \
     --enable-virglrenderer \
+    --enable-virtfs \
     --enable-vnc \
     --enable-vnc-jpeg \
-    --enable-png
+    --enable-vnc-sasl \
+    --enable-zstd
+
+  # Print the resolved Meson configuration in the CI log. Every enabled
+  # feature above is also a hard configure-time requirement, so dependencies
+  # cannot disappear silently when the Debian snapshot changes.
+  meson configure /build
 
   ninja qemu-system-x86_64
 
@@ -185,6 +254,7 @@ RUN <<'EOF_VERIFY'
   QEMU_MODULE_DIR=/nonexistent LD_BIND_NOW=1 \
     "$binary" -display help >/tmp/display-help 2>&1
   grep -F "egl-headless" /tmp/display-help
+  grep -F "sdl" /tmp/display-help
 
   QEMU_MODULE_DIR=/nonexistent LD_BIND_NOW=1 \
     "$binary" -device qxl-vga,help >/tmp/qxl-help 2>&1
