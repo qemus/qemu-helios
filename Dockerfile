@@ -35,7 +35,9 @@ EOF_SOURCES
     libvulkan-dev \
     meson \
     ninja-build \
-    pkg-config
+    pkg-config \
+    python3-mako \
+    python3-yaml
 
   rm -rf /var/lib/apt/lists/*
 EOF_BUILD_DEPS
