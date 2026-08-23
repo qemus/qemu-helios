@@ -56,13 +56,13 @@ QEMU has supported accelerated `virtio-gpu` graphics for Linux guests for years.
 
 Linux already contains the `virtio_gpu` kernel driver, while Mesa provides the userspace graphics drivers required to make use of it. A Linux guest can therefore use VirGL for OpenGL or Venus for Vulkan and send rendering commands through QEMU to the host GPU.
 
-Windows does not normally have an equivalent accelerated virtio-gpu stack.
+Windows does not normally have an equivalent accelerated `virtio-gpu` stack.
 
-The standard Windows virtio-gpu driver can provide a framebuffer and display output, but that alone does not provide a complete accelerated 3D graphics stack comparable to what Linux guests have.
+The standard Windows `virtio-gpu` driver can provide a framebuffer and display output, but that alone does not provide a complete accelerated 3D graphics stack comparable to what Linux guests have.
 
 Helios fills that gap.
 
-The modern Helios architecture implements a Windows WDDM render and display adapter around virtio-gpu. Windows therefore sees Helios as an actual graphics adapter and can use it for desktop composition and application rendering, while the expensive GPU work is forwarded to the host instead of being executed by a software renderer inside the VM.
+The modern Helios architecture implements a Windows WDDM render and display adapter around `virtio-gpu`. Windows therefore sees Helios as an actual graphics adapter and can use it for desktop composition and application rendering, while the expensive GPU work is forwarded to the host instead of being executed by a software renderer inside the VM.
 
 This avoids two undesirable alternatives:
 
