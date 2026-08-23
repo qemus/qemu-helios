@@ -93,15 +93,13 @@ RUN <<EOF_SOURCE
   git -C virglrenderer checkout --detach FETCH_HEAD
 EOF_SOURCE
 
-COPY patches/virglrenderer-device-memory-budget.patch /tmp/
+COPY patches/device-memory-budget.patch /tmp/
 
 RUN <<'EOF_VIRGL_PATCHES'
   set -eu
 
-  git -C /src/virglrenderer apply --check \
-    /tmp/virglrenderer-device-memory-budget.patch
-  git -C /src/virglrenderer apply \
-    /tmp/virglrenderer-device-memory-budget.patch
+  git -C /src/virglrenderer apply --check /tmp/device-memory-budget.patch
+  git -C /src/virglrenderer apply /tmp/device-memory-budget.patch
   git -C /src/virglrenderer diff --check
 EOF_VIRGL_PATCHES
 
