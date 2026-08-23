@@ -143,6 +143,7 @@ RUN <<'EOF_BUILD'
     --disable-relocatable \
     --disable-sndio \
     --disable-strip \
+    --disable-tools \
     --disable-user \
     --disable-vte \
     --disable-xkbcommon \
