@@ -7,15 +7,16 @@
 
 </div></h1>
 
-Run QEMU OpenGL on headless Debian hosts without installing an Xorg server or desktop environment.
+Run QEMU OpenGL and Vulkan/Venus on headless Debian hosts without installing an Xorg server or desktop environment.
 
-`qemu-render` provides the host-side  VirGL/Venus and Mesa runtime needed by Debian's official QEMU OpenGL module. It keeps hardware-accelerated EGL/GBM rendering and VirGL/Venus available on servers, containers, and appliance-style systems while leaving out runtime components that are unnecessary for this use case.
+`qemu-render` provides the host-side Mesa OpenGL/Vulkan and VirGL/Venus runtime used by QEMU. It keeps hardware-accelerated EGL/GBM rendering, hardware Vulkan, and VirGL/Venus available on servers, containers, and appliance-style systems while leaving out runtime components that are unnecessary for this use case.
 
 ## Features ✨
 
 - Designed for headless Debian hosts with no Xorg server or desktop environment
 - Hardware-accelerated EGL and GBM rendering through Mesa on Intel and AMD GPUs
 - Supports the Mesa `i915`, `crocus`, `iris`, `r600`, and `radeonsi` Gallium drivers
+- Hardware Vulkan through Mesa ANV and HasVK on Intel GPUs and RADV/ACO on AMD GPUs
 - Custom virglrenderer with VirGL, Venus, and `virgl_render_server` support
 - QXL support through a reduced SPICE server runtime for QEMU's VNC display path
 
@@ -30,7 +31,7 @@ libspice-server1
 libvirglrenderer1
 ```
 
-and conflicts with/replaces Debian's stock packages with those names. It also conflicts with/replaces `virgl-server` because `qemu-render` ships its own `virgl_render_server`. On a headless host, this lets Debian's official QEMU modules satisfy their normal runtime dependencies without installing the broader stock Mesa Gallium/LLVM and SPICE multimedia runtime stacks.
+It also provides the virtual `vulkan-icd` package and conflicts with/replaces Debian's `mesa-vulkan-drivers`, because `qemu-render` ships its own Intel and AMD Vulkan ICDs. It conflicts with/replaces `virgl-server` for the same reason around `virgl_render_server`. On a headless host, this lets Debian's official QEMU modules satisfy their normal runtime dependencies without installing the broader stock Mesa Gallium/Vulkan/LLVM and SPICE multimedia runtime stacks.
 
 ## Mesa runtime 🎨
 
@@ -41,9 +42,14 @@ The Mesa portion contains:
 - `iris` for newer Intel GPUs
 - `r600` for older AMD Radeon GPUs based on TeraScale
 - `radeonsi` for newer AMD Radeon GPUs based on GCN and RDNA
+- ANV for newer Intel Vulkan-capable GPUs
+- HasVK for older Intel Vulkan-capable GPUs
+- RADV with ACO for AMD Vulkan-capable GPUs
 - EGL and GBM for headless rendering
 
-LLVM is available only while compiling Mesa build-time tools. The final Mesa runtime is built with both `-Dllvm=disabled` and `-Damd-use-llvm=false`, and the finished package is verified to contain no direct or transitive LLVM runtime dependency.
+The Vulkan build contains only the Intel and AMD hardware ICDs needed for this project; Lavapipe and optional Vulkan layers are not included. Intel ray tracing is disabled to avoid the separate Intel CLC/ray-tracing compiler path. Debian's small `libvulkan1` loader is used at runtime.
+
+LLVM is available only while compiling Mesa build-time tools. The final OpenGL and Vulkan runtime is built with both `-Dllvm=disabled` and `-Damd-use-llvm=false`, and the finished package is verified to contain no direct or transitive LLVM runtime dependency.
 
 ## VirGL and Venus runtime 🎮
 
