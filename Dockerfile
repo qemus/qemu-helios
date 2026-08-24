@@ -87,6 +87,14 @@ RUN <<EOF_SOURCE
     exit 1
   fi
 
+  # A git tag checkout does not contain Meson wrap sources. Prefetch the
+  # subprojects required by the system UI and TCG test configuration so the
+  # later --disable-download configure step can remain offline.
+  meson subprojects download --sourcedir qemu \
+    keycodemapdb \
+    berkeley-softfloat-3 \
+    berkeley-testfloat-3
+
 EOF_SOURCE
 
 COPY files/ /tmp/helios-files/
