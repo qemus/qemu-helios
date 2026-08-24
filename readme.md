@@ -283,7 +283,7 @@ The Windows driver, Mesa Venus ICD, DXVK integration and other guest-side compon
 
 ## Design 📦
 
-The binary is based on upstream QEMU 11.1.0 plus the patch and source files stored directly in this repository.
+The binary is based on upstream QEMU 11.1.0 plus the Helios patch and source files stored directly in this repository and the pinned enhanced QEMU VMVGA source overlay.
 
 QEMU loadable modules are disabled for this build. OpenGL/VirGL support is compiled into the executable so the custom binary does not depend on Debian's version-matched QEMU module files. Runtime graphics libraries remain dynamically linked and are supplied by the normal QEMU environment.
 
