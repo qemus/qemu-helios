@@ -44,7 +44,7 @@ EOF_BUILD_DEPS
 
 WORKDIR /src
 
-# QEMU's Helios scanout code uses virglrenderer's extended resource metadata API.
+# Helios scanout code uses virglrenderer's extended resource metadata API.
 # Build against the exact virglrenderer API used by qemu-render so that support
 # cannot silently compile out when Debian ships older development headers.
 RUN <<EOF_VIRGL
@@ -144,15 +144,26 @@ RUN <<'EOF_BUILD'
     --firmwarepath=/usr/share/qemu:/usr/share/seabios \
     --extra-cflags="$extra_cflags" \
     --extra-ldflags="$extra_ldflags" \
-    --audio-drv-list=pipewire,pa,alsa,jack,oss,sdl \
+    --audio-drv-list=alsa,oss \
+    --disable-blkio \
+    --disable-bzip2 \
     --disable-containers \
+    --disable-curl \
     --disable-docs \
     --disable-download \
     --disable-gtk \
     --disable-install-blobs \
+    --disable-jack \
+    --disable-libiscsi \
+    --disable-libnfs \
+    --disable-libssh \
     --disable-linux-user \
     --disable-modules \
+    --disable-pa \
+    --disable-pipewire \
+    --disable-rbd \
     --disable-relocatable \
+    --disable-sdl \
     --disable-sndio \
     --disable-strip \
     --disable-tools \
@@ -162,22 +173,16 @@ RUN <<'EOF_BUILD'
     --disable-xen \
     --enable-system \
     --enable-attr \
-    --enable-blkio \
     --enable-bpf \
     --enable-brlapi \
-    --enable-bzip2 \
     --enable-cap-ng \
     --enable-capstone \
-    --enable-curl \
     --enable-curses \
     --enable-fdt \
     --enable-fuse \
     --enable-gnutls \
     --enable-kvm \
-    --enable-libiscsi \
-    --enable-libnfs \
     --enable-libpmem \
-    --enable-libssh \
     --enable-libusb \
     --enable-libudev \
     --enable-linux-aio \
@@ -187,9 +192,7 @@ RUN <<'EOF_BUILD'
     --enable-opengl \
     --enable-pixman \
     --enable-png \
-    --enable-rbd \
     --enable-rdma \
-    --enable-sdl \
     --enable-seccomp \
     --enable-slirp \
     --enable-smartcard \
@@ -267,7 +270,6 @@ RUN <<'EOF_VERIFY'
   QEMU_MODULE_DIR=/nonexistent LD_BIND_NOW=1 \
     "$binary" -display help >/tmp/display-help 2>&1
   grep -F "egl-headless" /tmp/display-help
-  grep -F "sdl" /tmp/display-help
 
   QEMU_MODULE_DIR=/nonexistent LD_BIND_NOW=1 \
     "$binary" -device qxl-vga,help >/tmp/qxl-help 2>&1
