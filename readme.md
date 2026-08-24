@@ -336,6 +336,10 @@ The patched `egl-headless` path therefore continues capturing the latest GPU sta
 
 Improves VNC's handling of rapidly changing lossy regions by coalescing damage more effectively instead of repeatedly encoding redundant intermediate updates.
 
+## VMware SVGA II support 🖥️
+
+This build also includes an enhanced [QEMU VMVGA](https://github.com/qemus/qemu-vmvga) implementation to improve performance for Windows NT 5.x guests as they do not support GPU acceleration via Helios. It replaces QEMU's standard `vmware-svga` display-device source with broader VMware SVGA register, FIFO command, capability, cursor and display support, including newer VMware SVGA definitions.
+
 ## Acknowledgements 🙏
 
 Special thanks to [TibixDev](https://github.com/TibixDev) and the [WinBoat](https://github.com/winboat-org/winboat) team, this project would not exist without their invaluable work.
