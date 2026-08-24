@@ -1,7 +1,8 @@
 diff --git a/ui/egl-headless.c b/ui/egl-headless.c
+index c5d38112554f72b627be947e4d61eca6c99d30ed..b3cee1327717d64513e8894f55ea9471608d1c68 100644
 --- a/ui/egl-headless.c
 +++ b/ui/egl-headless.c
-@@ -31,6 +31,14 @@ typedef struct egl_dpy {
+@@ -32,6 +32,14 @@ typedef struct egl_dpy {
      HeliosVulkanReadback *vk_readback;
      QemuDmaBuf *vk_dmabuf;
      HeliosVulkanReadbackCache *vk_readback_cache;
@@ -16,7 +17,7 @@ diff --git a/ui/egl-headless.c b/ui/egl-headless.c
      QemuDmaBuf *cpu_dmabuf;
      void *cpu_map;
      size_t cpu_map_len;
-@@ -152,17 +160,24 @@ static uint64_t helios_dmabuf_ino(QemuDmaBuf *dmabuf)
+@@ -140,10 +148,15 @@ static uint64_t helios_dmabuf_ino(QemuDmaBuf *dmabuf)
  
  static void egl_vulkan_readback_deactivate(egl_dpy *edpy)
  {
@@ -32,14 +33,16 @@ diff --git a/ui/egl-headless.c b/ui/egl-headless.c
  }
  
  static void egl_vulkan_readback_cache_clear(egl_dpy *edpy)
- {
+@@ -151,6 +164,8 @@ static void egl_vulkan_readback_cache_clear(egl_dpy *edpy)
      egl_vulkan_readback_deactivate(edpy);
      g_clear_pointer(&edpy->vk_readback_cache,
                      helios_vulkan_readback_cache_free);
 +    edpy->vk_next_publish_ns = 0;
 +    edpy->vk_pending = false;
  }
-@@ -238,6 +253,78 @@ static void egl_trace_scanout_read(egl_dpy *edpy, QemuDmaBuf *dmabuf,
+ 
+ static HeliosVulkanReadback *
+@@ -214,6 +229,76 @@ static void egl_trace_scanout_read(egl_dpy *edpy, QemuDmaBuf *dmabuf,
                                stats.csum, edpy->read_seq++);
  }
  
@@ -116,7 +119,7 @@ diff --git a/ui/egl-headless.c b/ui/egl-headless.c
  static void egl_cpu_dmabuf_unmap(egl_dpy *edpy)
  {
      if (edpy->cpu_map) {
-@@ -492,8 +579,13 @@ static void egl_scanout_dmabuf(DisplayChangeListener *dcl,
+@@ -468,8 +553,13 @@ static void egl_scanout_dmabuf(DisplayChangeListener *dcl,
      uint32_t width, height, texture;
  #ifdef CONFIG_LINUX
      egl_dpy *edpy = container_of(dcl, egl_dpy, dcl);
@@ -129,7 +132,9 @@ diff --git a/ui/egl-headless.c b/ui/egl-headless.c
 +        egl_vulkan_readback_deactivate(edpy);
 +    }
      egl_cpu_dmabuf_unmap(edpy);
-@@ -520,6 +612,11 @@ static void egl_scanout_dmabuf(DisplayChangeListener *dcl,
+ 
+     /*
+@@ -495,6 +585,11 @@ static void egl_scanout_dmabuf(DisplayChangeListener *dcl,
      glGetError();
      texture = qemu_dmabuf_get_texture(dmabuf);
      if (texture) {
@@ -140,7 +145,8 @@ diff --git a/ui/egl-headless.c b/ui/egl-headless.c
 +#endif
          width = qemu_dmabuf_get_width(dmabuf);
          height = qemu_dmabuf_get_height(dmabuf);
-@@ -633,19 +730,66 @@ static void egl_scanout_flush(DisplayChangeListener *dcl,
+ 
+@@ -601,12 +696,58 @@ static void egl_scanout_flush(DisplayChangeListener *dcl,
      assert(surface_format(edpy->ds) == PIXMAN_x8r8g8b8);
  
  #if defined(CONFIG_GBM) && defined(CONFIG_LINUX)
@@ -203,14 +209,15 @@ diff --git a/ui/egl-headless.c b/ui/egl-headless.c
          }
          return;
      }
-@@ -655,6 +799,7 @@ static void egl_scanout_flush(DisplayChangeListener *dcl,
+@@ -614,6 +755,7 @@ static void egl_scanout_flush(DisplayChangeListener *dcl,
+     if (egl_cpu_dmabuf_flush(edpy, x, y, w, h)) {
          egl_trace_scanout_read(edpy, edpy->cpu_dmabuf, NULL, x, y, w, h);
          qemu_console_update(edpy->dcl.con, x, y, w, h);
 +        edpy->force_full_update = false;
          return;
      }
  #endif
-@@ -668,6 +813,9 @@ static void egl_scanout_flush(DisplayChangeListener *dcl,
+@@ -636,6 +778,9 @@ static void egl_scanout_flush(DisplayChangeListener *dcl,
  
      egl_fb_read(edpy->ds, &edpy->blit_fb);
      qemu_console_update(edpy->dcl.con, x, y, w, h);
@@ -218,9 +225,11 @@ diff --git a/ui/egl-headless.c b/ui/egl-headless.c
 +    edpy->force_full_update = false;
 +#endif
  }
-@@ -738,6 +886,11 @@ static void egl_headless_init(DisplayState *ds, DisplayOptions *opts)
-         edpy->dcl.con = con;
-         edpy->dcl.ops = &egl_ops;
+ 
+ static const DisplayChangeListenerOps egl_ops = {
+@@ -706,6 +851,11 @@ static void egl_headless_init(DisplayState *ds, DisplayOptions *opts)
+ 
+         edpy = g_new0(egl_dpy, 1);
          edpy->gls = qemu_gl_init_shader();
 +#if defined(CONFIG_GBM) && defined(CONFIG_LINUX)
 +        edpy->vk_publish_timer = timer_new_ns(QEMU_CLOCK_REALTIME,
@@ -229,11 +238,23 @@ diff --git a/ui/egl-headless.c b/ui/egl-headless.c
 +#endif
          ctx = g_new0(DisplayGLCtx, 1);
          ctx->ops = &eglctx_ops;
-         qemu_console_set_display_gl_ctx(con, ctx);
+         edpy->ctx = ctx;
+@@ -729,6 +879,10 @@ static void egl_headless_cleanup(void)
+         egl_fb_destroy(&edpy->guest_fb);
+         egl_fb_destroy(&edpy->cursor_fb);
+         egl_fb_destroy(&edpy->blit_fb);
++#if defined(CONFIG_GBM) && defined(CONFIG_LINUX)
++        egl_vulkan_readback_cache_clear(edpy);
++        g_clear_pointer(&edpy->vk_publish_timer, timer_free);
++#endif
+         qemu_gl_fini_shader(edpy->gls);
+         g_free(edpy->ctx);
+         g_free(edpy);
 diff --git a/ui/trace-events b/ui/trace-events
+index 1ccb81c881ad84dd6dda973de5427059b8313fad..5b6e157ff36a8e9887ff66fab19369a51c5f310c 100644
 --- a/ui/trace-events
 +++ b/ui/trace-events
-@@ -188,3 +188,5 @@ egl_init_d3d11_device(void *p) "d3d device: %p"
+@@ -214,3 +214,5 @@ egl_init_d3d11_device(void *p) "d3d device: %p"
  # egl-headless.c -- Helios scan-out oracle
  helios_scanout_bind(uint32_t res, uint64_t bound_ino, uint64_t size, uint32_t bw, uint32_t bh, uint32_t stride, uint32_t offset, uint64_t read_ino, uint64_t reuse, const char *path) "res %u bound_ino %"PRIu64" size %"PRIu64" backing %ux%u stride %u offset %u read_ino %"PRIu64" reuse %"PRIu64" path %s"
  helios_scanout_read(uint32_t res, uint64_t bound_ino, uint64_t read_ino, uint32_t xy, uint32_t wh, uint32_t sampled, uint32_t nonzero, uint32_t max, uint64_t csum, uint64_t seq) "res %u bound_ino %"PRIu64" read_ino %"PRIu64" xy 0x%08x wh 0x%08x sampled %u nonzero %u max %u csum 0x%016"PRIx64" seq %"PRIu64

@@ -1,4 +1,5 @@
 diff --git a/hw/display/virtio-gpu-udmabuf-stubs.c b/hw/display/virtio-gpu-udmabuf-stubs.c
+index 85d03935a33215599bf70d6dcf2b2309cc97c6a5..d2ecfaaa8def29e8e11da469c2dce6047a3ff1e0 100644
 --- a/hw/display/virtio-gpu-udmabuf-stubs.c
 +++ b/hw/display/virtio-gpu-udmabuf-stubs.c
 @@ -21,7 +21,8 @@ int virtio_gpu_update_dmabuf(VirtIOGPU *g,
@@ -12,9 +13,10 @@ diff --git a/hw/display/virtio-gpu-udmabuf-stubs.c b/hw/display/virtio-gpu-udmab
      /* nothing (stub) */
      return 0;
 diff --git a/hw/display/virtio-gpu-udmabuf.c b/hw/display/virtio-gpu-udmabuf.c
+index 5f08c855dde1af50f6899f4b079216255eab0822..7f94218fadc296b20e63f9dabbafcb72847192cf 100644
 --- a/hw/display/virtio-gpu-udmabuf.c
 +++ b/hw/display/virtio-gpu-udmabuf.c
-@@ -187,7 +187,8 @@ static VGPUDMABuf
+@@ -188,7 +188,8 @@ static VGPUDMABuf
                            uint32_t scanout_id,
                            struct virtio_gpu_simple_resource *res,
                            struct virtio_gpu_framebuffer *fb,
@@ -24,7 +26,7 @@ diff --git a/hw/display/virtio-gpu-udmabuf.c b/hw/display/virtio-gpu-udmabuf.c
  {
      VGPUDMABuf *dmabuf;
      uint32_t offset = 0;
-@@ -201,8 +202,9 @@ static VGPUDMABuf
+@@ -202,8 +203,9 @@ static VGPUDMABuf
                                    &offset, &fb->stride,
                                    r->x, r->y, fb->width, fb->height,
                                    qemu_pixman_to_drm_format(fb->format),
@@ -35,7 +37,7 @@ diff --git a/hw/display/virtio-gpu-udmabuf.c b/hw/display/virtio-gpu-udmabuf.c
      dmabuf->scanout_id = scanout_id;
      QTAILQ_INSERT_HEAD(&g->dmabuf.bufs, dmabuf, next);
  
-@@ -213,13 +215,15 @@ int virtio_gpu_update_dmabuf(VirtIOGPU *g,
+@@ -214,13 +216,15 @@ int virtio_gpu_update_dmabuf(VirtIOGPU *g,
                               uint32_t scanout_id,
                               struct virtio_gpu_simple_resource *res,
                               struct virtio_gpu_framebuffer *fb,
@@ -54,22 +56,26 @@ diff --git a/hw/display/virtio-gpu-udmabuf.c b/hw/display/virtio-gpu-udmabuf.c
          return -EINVAL;
      }
 diff --git a/hw/display/virtio-gpu-virgl.c b/hw/display/virtio-gpu-virgl.c
+index 6e298f997d66bc9078a020f7436abc8108e6ef04..2c84259a36b4d27bdac377c55747f39613f27c01 100644
 --- a/hw/display/virtio-gpu-virgl.c
 +++ b/hw/display/virtio-gpu-virgl.c
-@@ -8,6 +8,7 @@
+@@ -21,6 +21,7 @@
  #include "hw/virtio/virtio-gpu-pixman.h"
  
  #include "ui/egl-helpers.h"
 +#include "standard-headers/drm/drm_fourcc.h"
  
  #include <virglrenderer.h>
-@@ -31,6 +32,7 @@ struct virtio_gpu_virgl_resource {
+ 
+@@ -48,6 +49,7 @@ struct virtio_gpu_virgl_resource {
      struct virtio_gpu_simple_resource base;
      MemoryRegion *mr;
      void *map_fixed;
 +    uint64_t dmabuf_modifier;
  };
-@@ -820,6 +822,7 @@ static void virgl_cmd_resource_create_blob(VirtIOGPU *g,
+ 
+ static struct virtio_gpu_virgl_resource *
+@@ -853,6 +855,7 @@ static void virgl_cmd_resource_create_blob(VirtIOGPU *g,
      res->base.resource_id = cblob.resource_id;
      res->base.blob_size = cblob.size;
      res->base.dmabuf_fd = -1;
@@ -77,7 +83,7 @@ diff --git a/hw/display/virtio-gpu-virgl.c b/hw/display/virtio-gpu-virgl.c
  
      if (cblob.blob_mem != VIRTIO_GPU_BLOB_MEM_HOST3D) {
          ret = virtio_gpu_create_mapping_iov(g, cblob.nr_entries, sizeof(cblob),
-@@ -849,7 +852,21 @@ static void virgl_cmd_resource_create_blob(VirtIOGPU *g,
+@@ -882,7 +885,21 @@ static void virgl_cmd_resource_create_blob(VirtIOGPU *g,
          return;
      }
  
@@ -99,7 +105,7 @@ diff --git a/hw/display/virtio-gpu-virgl.c b/hw/display/virtio-gpu-virgl.c
      if (ret) {
          qemu_log_mask(LOG_GUEST_ERROR,
                        "%s: resource does not have info %d: %s\n",
-@@ -986,13 +1003,20 @@ static void virgl_cmd_set_scanout_blob(VirtIOGPU *g,
+@@ -1012,13 +1029,20 @@ static void virgl_cmd_set_scanout_blob(VirtIOGPU *g,
          return;
      }
  
@@ -123,9 +129,10 @@ diff --git a/hw/display/virtio-gpu-virgl.c b/hw/display/virtio-gpu-virgl.c
                        __func__);
          cmd->error = VIRTIO_GPU_RESP_ERR_INVALID_PARAMETER;
 diff --git a/hw/display/virtio-gpu.c b/hw/display/virtio-gpu.c
+index fbb6fec7a0ade05091419c19a5cd020c1f456184..9717e0961ac95f995359d4eb2b730d826751b14b 100644
 --- a/hw/display/virtio-gpu.c
 +++ b/hw/display/virtio-gpu.c
-@@ -8,6 +8,8 @@
+@@ -32,6 +32,8 @@
  #include "qemu/module.h"
  #include "qapi/error.h"
  #include "qemu/error-report.h"
@@ -133,7 +140,8 @@ diff --git a/hw/display/virtio-gpu.c b/hw/display/virtio-gpu.c
 +#include "standard-headers/drm/drm_fourcc.h"
  
  #define VIRTIO_GPU_VM_VERSION 1
-@@ -619,7 +621,8 @@ static bool virtio_gpu_do_set_scanout(VirtIOGPU *g,
+ 
+@@ -691,7 +693,8 @@ static bool virtio_gpu_do_set_scanout(VirtIOGPU *g,
  
      if (res->blob) {
          if (qemu_console_has_gl(scanout->con)) {
@@ -143,7 +151,7 @@ diff --git a/hw/display/virtio-gpu.c b/hw/display/virtio-gpu.c
                  virtio_gpu_update_scanout(g, scanout_id, res, fb, r);
              } else {
                  *error = VIRTIO_GPU_RESP_ERR_OUT_OF_MEMORY;
-@@ -704,11 +707,13 @@ static void virtio_gpu_set_scanout(VirtIOGPU *g,
+@@ -781,11 +784,13 @@ static void virtio_gpu_set_scanout(VirtIOGPU *g,
                                &fb, res, &ss.r, &cmd->error);
  }
  
@@ -161,7 +169,7 @@ diff --git a/hw/display/virtio-gpu.c b/hw/display/virtio-gpu.c
      uint32_t bytes_pp;
  
      fb->format = virtio_gpu_get_pixman_format(ss->format);
-@@ -720,29 +725,52 @@ bool virtio_gpu_scanout_blob_to_fb(struct virtio_gpu_framebuffer *fb,
+@@ -801,7 +806,8 @@ bool virtio_gpu_scanout_blob_to_fb(struct virtio_gpu_framebuffer *fb,
      fb->height = ss->height;
      fb->stride = ss->strides[0];
  
@@ -171,13 +179,7 @@ diff --git a/hw/display/virtio-gpu.c b/hw/display/virtio-gpu.c
          qemu_log_mask(LOG_GUEST_ERROR,
                        "%s: stride %u too small for width %u at %u bpp\n",
                        __func__, fb->stride, fb->width, bytes_pp);
-         return false;
-     }
--
-     if (fb->stride > INT_MAX) {
-         qemu_log_mask(LOG_GUEST_ERROR, "%s: stride is %" PRIu32
-                       ", larger than the supported maximum (%d)\n",
-                       __func__, fb->stride, INT_MAX);
+@@ -815,23 +821,55 @@ bool virtio_gpu_scanout_blob_to_fb(struct virtio_gpu_framebuffer *fb,
          return false;
      }
  
@@ -200,10 +202,9 @@ diff --git a/hw/display/virtio-gpu.c b/hw/display/virtio-gpu.c
                        __func__);
          return false;
      }
--
--    fb->offset = offset;
 +    fb->offset = (uint32_t)offset;
-+
+ 
+-    fb->offset = offset;
 +    /*
 +     * blob_size is a linear byte-span contract for ordinary blob scanout.
 +     * A renderer-exported native DMA-BUF may instead be a Vulkan OPTIMAL image:
@@ -223,7 +224,7 @@ diff --git a/hw/display/virtio-gpu.c b/hw/display/virtio-gpu.c
  
      return true;
  }
-+
+ 
 +bool virtio_gpu_scanout_blob_to_fb(struct virtio_gpu_framebuffer *fb,
 +                                   struct virtio_gpu_set_scanout_blob *ss,
 +                                   uint64_t blob_size)
@@ -238,10 +239,15 @@ diff --git a/hw/display/virtio-gpu.c b/hw/display/virtio-gpu.c
 +{
 +    return virtio_gpu_scanout_blob_to_fb_layout(fb, ss, blob_size, true);
 +}
++
+ 
+ 
+ static void virtio_gpu_set_scanout_blob(VirtIOGPU *g,
 diff --git a/include/hw/virtio/virtio-gpu.h b/include/hw/virtio/virtio-gpu.h
+index 220231ec9d436e99447c2363eefc9727a65c61a8..89aeacd302199d100bba18f4c520497dc6f6a7eb 100644
 --- a/include/hw/virtio/virtio-gpu.h
 +++ b/include/hw/virtio/virtio-gpu.h
-@@ -369,6 +369,10 @@ void virtio_gpu_update_cursor_data(VirtIOGPU *g,
+@@ -385,6 +385,10 @@ bool virtio_gpu_check_scanout_bounds(uint32_t scanout_id, uint32_t resource_id,
  bool virtio_gpu_scanout_blob_to_fb(struct virtio_gpu_framebuffer *fb,
                                     struct virtio_gpu_set_scanout_blob *ss,
                                     uint64_t blob_size);
@@ -252,7 +258,7 @@ diff --git a/include/hw/virtio/virtio-gpu.h b/include/hw/virtio/virtio-gpu.h
  
  /* virtio-gpu-udmabuf.c */
  bool virtio_gpu_have_udmabuf(void);
-@@ -379,7 +383,8 @@ int virtio_gpu_update_dmabuf(VirtIOGPU *g,
+@@ -395,7 +399,8 @@ int virtio_gpu_update_dmabuf(VirtIOGPU *g,
                               uint32_t scanout_id,
                               struct virtio_gpu_simple_resource *res,
                               struct virtio_gpu_framebuffer *fb,
@@ -263,6 +269,7 @@ diff --git a/include/hw/virtio/virtio-gpu.h b/include/hw/virtio/virtio-gpu.h
  void virtio_gpu_update_scanout(VirtIOGPU *g,
                                 uint32_t scanout_id,
 diff --git a/include/ui/dmabuf.h b/include/ui/dmabuf.h
+index 3decdca4979c245fde7db635776bc133f9c964ef..dd68047f8aa820b128f736d2b00f1bbb6bb58f1b 100644
 --- a/include/ui/dmabuf.h
 +++ b/include/ui/dmabuf.h
 @@ -35,6 +35,7 @@ const uint32_t *qemu_dmabuf_get_strides(QemuDmaBuf *dmabuf, int *nstrides);
@@ -282,6 +289,7 @@ diff --git a/include/ui/dmabuf.h b/include/ui/dmabuf.h
  void qemu_dmabuf_set_sync(QemuDmaBuf *dmabuf, void *sync);
  void qemu_dmabuf_set_draw_submitted(QemuDmaBuf *dmabuf, bool draw_submitted);
 diff --git a/include/ui/gtk.h b/include/ui/gtk.h
+index 5c9c34a069ea2fa699dc37095b216b2c41c5548d..91a1db8491ac80153e2b92eb4906cd587b4fe80c 100644
 --- a/include/ui/gtk.h
 +++ b/include/ui/gtk.h
 @@ -24,6 +24,9 @@
@@ -304,6 +312,7 @@ diff --git a/include/ui/gtk.h b/include/ui/gtk.h
 +#endif
  #endif
  } VirtualGfxConsole;
+ 
 @@ -93,6 +100,14 @@ typedef struct VirtualConsole {
      };
  } VirtualConsole;
@@ -318,7 +327,9 @@ diff --git a/include/ui/gtk.h b/include/ui/gtk.h
 +
  struct GtkDisplayState {
      GtkWidget *window;
+ 
 diff --git a/include/ui/sdl2.h b/include/ui/sdl2.h
+index 9daf5ecffae72f1cd50718416db30803eba147c2..f9eeef9a1fba62214ada6b373635f2c94f174b4a 100644
 --- a/include/ui/sdl2.h
 +++ b/include/ui/sdl2.h
 @@ -24,6 +24,9 @@
@@ -341,7 +352,9 @@ diff --git a/include/ui/sdl2.h b/include/ui/sdl2.h
 +#endif
  #endif
  };
+ 
 diff --git a/ui/dmabuf.c b/ui/dmabuf.c
+index 7433a268f0df620508accf2218de5eee6c66cc14..a4a863056da6f596f41536b6308208b4aa117c1c 100644
 --- a/ui/dmabuf.c
 +++ b/ui/dmabuf.c
 @@ -19,6 +19,7 @@ struct QemuDmaBuf {
@@ -379,6 +392,7 @@ diff --git a/ui/dmabuf.c b/ui/dmabuf.c
  {
      assert(dmabuf != NULL);
 diff --git a/ui/egl-headless.c b/ui/egl-headless.c
+index ba27efcf4c3e16ed8c84c1f4ca72c1ad4f32ecd9..25477febd037f775032e3f61d5a851c63e5214f9 100644
 --- a/ui/egl-headless.c
 +++ b/ui/egl-headless.c
 @@ -1,11 +1,19 @@
@@ -401,7 +415,7 @@ diff --git a/ui/egl-headless.c b/ui/egl-headless.c
  
  typedef struct egl_dpy {
      DisplayChangeListener dcl;
-@@ -17,6 +25,18 @@ typedef struct egl_dpy {
+@@ -18,6 +26,18 @@ typedef struct egl_dpy {
      bool y_0_top;
      uint32_t pos_x;
      uint32_t pos_y;
@@ -418,7 +432,9 @@ diff --git a/ui/egl-headless.c b/ui/egl-headless.c
 +    int cpu_sync_state;
 +#endif
  } egl_dpy;
-@@ -39,6 +59,238 @@ static void egl_gfx_switch(DisplayChangeListener *dcl,
+ 
+ static GPtrArray *egl_dpys;
+@@ -42,6 +62,238 @@ static void egl_gfx_switch(DisplayChangeListener *dcl,
      edpy->ds = new_surface;
  }
  
@@ -657,7 +673,7 @@ diff --git a/ui/egl-headless.c b/ui/egl-headless.c
  static QEMUGLContext egl_create_context(DisplayGLCtx *dgc,
                                          QEMUGLParams *params)
  {
-@@ -49,6 +301,10 @@ static void egl_scanout_disable(DisplayChangeListener *dcl)
+@@ -52,6 +304,10 @@ static void egl_scanout_disable(DisplayChangeListener *dcl)
  {
      egl_dpy *edpy = container_of(dcl, egl_dpy, dcl);
  
@@ -668,13 +684,13 @@ diff --git a/ui/egl-headless.c b/ui/egl-headless.c
      egl_fb_destroy(&edpy->guest_fb);
      egl_fb_destroy(&edpy->blit_fb);
  }
-@@ -84,18 +340,80 @@ static void egl_scanout_dmabuf(DisplayChangeListener *dcl,
+@@ -87,18 +343,72 @@ static void egl_scanout_dmabuf(DisplayChangeListener *dcl,
                                 QemuDmaBuf *dmabuf)
  {
      uint32_t width, height, texture;
 +#ifdef CONFIG_LINUX
 +    egl_dpy *edpy = container_of(dcl, egl_dpy, dcl);
-+
+ 
 +    egl_vulkan_readback_deactivate(edpy);
 +    egl_cpu_dmabuf_unmap(edpy);
 +
@@ -711,11 +727,9 @@ diff --git a/ui/egl-headless.c b/ui/egl-headless.c
 +
 +        egl_scanout_texture(dcl, texture, false, width, height, 0, 0,
 +                            width, height, NULL);
-         return;
-     }
- 
--    width = qemu_dmabuf_get_width(dmabuf);
--    height = qemu_dmabuf_get_height(dmabuf);
++        return;
++    }
++
 +    error_report("egl-headless: EGL DMA-BUF import failed for fourcc=0x%08x "
 +                 "modifier=0x%016" PRIx64,
 +                 qemu_dmabuf_get_fourcc(dmabuf),
@@ -725,9 +739,11 @@ diff --git a/ui/egl-headless.c b/ui/egl-headless.c
 +    if (qemu_dmabuf_get_modifier(dmabuf) == DRM_FORMAT_MOD_INVALID) {
 +        error_report("egl-headless: modifier-less DMA-BUF rejected; refusing "
 +                     "implicit LINEAR reinterpretation");
-+        return;
-+    }
-+
+         return;
+     }
+ 
+-    width = qemu_dmabuf_get_width(dmabuf);
+-    height = qemu_dmabuf_get_height(dmabuf);
 +    if (!egl_dmabuf_linear_span_fits_fd(dmabuf)) {
 +        error_report("egl-headless: native DMA-BUF layout requires EGL import");
 +        return;
@@ -744,7 +760,9 @@ diff --git a/ui/egl-headless.c b/ui/egl-headless.c
 +    egl_cpu_dmabuf_map(edpy, dmabuf);
 +#endif
  }
-@@ -123,6 +441,16 @@ static void egl_cursor_dmabuf(DisplayChangeListener *dcl,
+ 
+ static void egl_cursor_dmabuf(DisplayChangeListener *dcl,
+@@ -126,6 +436,16 @@ static void egl_cursor_dmabuf(DisplayChangeListener *dcl,
  static void egl_release_dmabuf(DisplayChangeListener *dcl,
                                 QemuDmaBuf *dmabuf)
  {
@@ -760,7 +778,8 @@ diff --git a/ui/egl-headless.c b/ui/egl-headless.c
 +#endif
      egl_dmabuf_release_texture(dmabuf);
  }
-@@ -142,12 +470,30 @@ static void egl_scanout_flush(DisplayChangeListener *dcl,
+ 
+@@ -145,12 +465,30 @@ static void egl_scanout_flush(DisplayChangeListener *dcl,
                                uint32_t w, uint32_t h)
  {
      egl_dpy *edpy = container_of(dcl, egl_dpy, dcl);
@@ -794,6 +813,7 @@ diff --git a/ui/egl-headless.c b/ui/egl-headless.c
          /* have cursor -> render using textures */
          egl_texture_blit(edpy->gls, &edpy->blit_fb, &edpy->guest_fb,
 diff --git a/ui/egl-helpers.c b/ui/egl-helpers.c
+index d689f187c4e56e7d07c03dab40b04c18a933d595..f52d0307c746f56b175b131f71bd28f27a069451 100644
 --- a/ui/egl-helpers.c
 +++ b/ui/egl-helpers.c
 @@ -410,13 +410,25 @@ void egl_dmabuf_import_texture(QemuDmaBuf *dmabuf)
@@ -824,9 +844,10 @@ diff --git a/ui/egl-helpers.c b/ui/egl-helpers.c
  
  void egl_dmabuf_release_texture(QemuDmaBuf *dmabuf)
 diff --git a/ui/gtk-egl.c b/ui/gtk-egl.c
+index adc81f34b1c80cd8f1a258736fbf47b68a804b79..11cca602c60e364d1e0ad4c82dee7b3544edd545 100644
 --- a/ui/gtk-egl.c
 +++ b/ui/gtk-egl.c
-@@ -226,6 +226,9 @@ void gd_egl_scanout_disable(DisplayChangeListener *dcl)
+@@ -227,6 +227,9 @@ void gd_egl_scanout_disable(DisplayChangeListener *dcl)
  {
      VirtualConsole *vc = container_of(dcl, VirtualConsole, gfx.dcl);
  
@@ -836,7 +857,7 @@ diff --git a/ui/gtk-egl.c b/ui/gtk-egl.c
      vc->gfx.w = 0;
      vc->gfx.h = 0;
      gtk_egl_set_scanout_mode(vc, false);
-@@ -240,6 +243,9 @@ void gd_egl_scanout_texture(DisplayChangeListener *dcl,
+@@ -241,6 +244,9 @@ void gd_egl_scanout_texture(DisplayChangeListener *dcl,
  {
      VirtualConsole *vc = container_of(dcl, VirtualConsole, gfx.dcl);
  
@@ -846,7 +867,7 @@ diff --git a/ui/gtk-egl.c b/ui/gtk-egl.c
      vc->gfx.x = x;
      vc->gfx.y = y;
      vc->gfx.w = w;
-@@ -272,6 +278,17 @@ void gd_egl_scanout_dmabuf(DisplayChangeListener *dcl,
+@@ -273,6 +279,17 @@ void gd_egl_scanout_dmabuf(DisplayChangeListener *dcl,
      eglMakeCurrent(qemu_egl_display, vc->gfx.esurface,
                     vc->gfx.esurface, vc->gfx.ectx);
  
@@ -864,7 +885,7 @@ diff --git a/ui/gtk-egl.c b/ui/gtk-egl.c
      egl_dmabuf_import_texture(dmabuf);
      texture = qemu_dmabuf_get_texture(dmabuf);
      if (!texture) {
-@@ -403,6 +420,18 @@ void gd_egl_flush(DisplayChangeListener *dcl,
+@@ -404,6 +421,18 @@ void gd_egl_flush(DisplayChangeListener *dcl,
      VirtualConsole *vc = container_of(dcl, VirtualConsole, gfx.dcl);
      GtkWidget *area = vc->gfx.drawing_area;
  
@@ -882,11 +903,12 @@ diff --git a/ui/gtk-egl.c b/ui/gtk-egl.c
 +
      if (vc->gfx.guest_fb.dmabuf &&
          !qemu_dmabuf_get_draw_submitted(vc->gfx.guest_fb.dmabuf)) {
-         graphic_hw_gl_block(vc->gfx.dcl.con, true);
+         qemu_dmabuf_set_draw_submitted(vc->gfx.guest_fb.dmabuf, true);
 diff --git a/ui/gtk-gl-area.c b/ui/gtk-gl-area.c
+index 29497019ee4680442973c4e0eeb364f8ca0ac860..64e45bdc792779bb3c54f01385810ccba8c7aae0 100644
 --- a/ui/gtk-gl-area.c
 +++ b/ui/gtk-gl-area.c
-@@ -315,6 +315,9 @@ void gd_gl_area_scanout_texture(DisplayChangeListener *dcl,
+@@ -295,6 +295,9 @@ void gd_gl_area_scanout_texture(DisplayChangeListener *dcl,
  {
      VirtualConsole *vc = container_of(dcl, VirtualConsole, gfx.dcl);
  
@@ -896,7 +918,7 @@ diff --git a/ui/gtk-gl-area.c b/ui/gtk-gl-area.c
      vc->gfx.x = x;
      vc->gfx.y = y;
      vc->gfx.w = w;
-@@ -337,6 +340,9 @@ void gd_gl_area_scanout_disable(DisplayChangeListener *dcl)
+@@ -317,6 +320,9 @@ void gd_gl_area_scanout_disable(DisplayChangeListener *dcl)
  {
      VirtualConsole *vc = container_of(dcl, VirtualConsole, gfx.dcl);
  
@@ -905,7 +927,8 @@ diff --git a/ui/gtk-gl-area.c b/ui/gtk-gl-area.c
 +#endif
      gtk_gl_area_set_scanout_mode(vc, false);
  }
-@@ -345,6 +351,18 @@ void gd_gl_area_scanout_flush(DisplayChangeListener *dcl,
+ 
+@@ -325,6 +331,18 @@ void gd_gl_area_scanout_flush(DisplayChangeListener *dcl,
  {
      VirtualConsole *vc = container_of(dcl, VirtualConsole, gfx.dcl);
  
@@ -923,8 +946,8 @@ diff --git a/ui/gtk-gl-area.c b/ui/gtk-gl-area.c
 +
      if (vc->gfx.guest_fb.dmabuf &&
          !qemu_dmabuf_get_draw_submitted(vc->gfx.guest_fb.dmabuf)) {
-         graphic_hw_gl_block(vc->gfx.dcl.con, true);
-@@ -363,6 +381,16 @@ void gd_gl_area_scanout_dmabuf(DisplayChangeListener *dcl,
+         qemu_dmabuf_set_draw_submitted(vc->gfx.guest_fb.dmabuf, true);
+@@ -342,6 +360,16 @@ void gd_gl_area_scanout_dmabuf(DisplayChangeListener *dcl,
      bool y0_top;
  
      gtk_gl_area_make_current(GTK_GL_AREA(vc->gfx.drawing_area));
@@ -942,6 +965,7 @@ diff --git a/ui/gtk-gl-area.c b/ui/gtk-gl-area.c
      texture = qemu_dmabuf_get_texture(dmabuf);
      if (!texture) {
 diff --git a/ui/gtk.c b/ui/gtk.c
+index 7078d89d6797f695e4ee737cb28f3b1810a66679..d75c611aa8c0c49e42448c978542ae4a82f0a573 100644
 --- a/ui/gtk.c
 +++ b/ui/gtk.c
 @@ -42,6 +42,9 @@
@@ -954,7 +978,7 @@ diff --git a/ui/gtk.c b/ui/gtk.c
  #ifdef G_OS_WIN32
  #include <gdk/gdkwin32.h>
  #endif
-@@ -565,6 +568,48 @@ static const DisplayChangeListenerOps dcl_ops = {
+@@ -571,6 +574,48 @@ static const DisplayChangeListenerOps dcl_ops = {
  
  #if defined(CONFIG_OPENGL)
  
@@ -1003,7 +1027,7 @@ diff --git a/ui/gtk.c b/ui/gtk.c
  static bool gd_has_dmabuf(DisplayChangeListener *dcl)
  {
      VirtualConsole *vc = container_of(dcl, VirtualConsole, gfx.dcl);
-@@ -584,6 +629,9 @@ static void gd_gl_release_dmabuf(DisplayChangeListener *dcl,
+@@ -590,6 +635,9 @@ static void gd_gl_release_dmabuf(DisplayChangeListener *dcl,
  #ifdef CONFIG_GBM
      VirtualConsole *vc = container_of(dcl, VirtualConsole, gfx.dcl);
  
@@ -1014,9 +1038,10 @@ diff --git a/ui/gtk.c b/ui/gtk.c
      if (vc->gfx.guest_fb.dmabuf == dmabuf) {
          vc->gfx.guest_fb.dmabuf = NULL;
 diff --git a/ui/meson.build b/ui/meson.build
+index d345f6c70d6a072601ec83a82b3d07c4db70d692..b5178a3b82cb2a520da07ec6b022c89d056dc57b 100644
 --- a/ui/meson.build
 +++ b/ui/meson.build
-@@ -60,13 +60,18 @@ if opengl.found()
+@@ -104,13 +104,18 @@ if opengl.found()
    opengl_ss.add(gbm, pixman)
    opengl_ss.add(when: [opengl],
                 if_true: files('shader.c', 'console-gl.c', 'egl-helpers.c', 'egl-context.c'))
@@ -1035,10 +1060,12 @@ diff --git a/ui/meson.build b/ui/meson.build
 +                      if_true: [egl_headless_sources, gbm])
    ui_modules += {'egl-headless' : egl_headless_ss}
  endif
+ 
 diff --git a/ui/sdl2-gl.c b/ui/sdl2-gl.c
+index 1547ad2f6f8061a6fae91afe2a952bcca19f3074..addf8409e682956afbb9443e22c6a014eb8b6b71 100644
 --- a/ui/sdl2-gl.c
 +++ b/ui/sdl2-gl.c
-@@ -7,6 +7,47 @@
+@@ -31,6 +31,47 @@
  #include "ui/console.h"
  #include "ui/input.h"
  #include "ui/sdl2.h"
@@ -1086,7 +1113,7 @@ diff --git a/ui/sdl2-gl.c b/ui/sdl2-gl.c
  
  static void sdl2_set_scanout_mode(struct sdl2_console *scon, bool scanout)
  {
-@@ -176,6 +217,9 @@ void sdl2_gl_scanout_disable(DisplayChangeListener *dcl)
+@@ -200,6 +241,9 @@ void sdl2_gl_scanout_disable(DisplayChangeListener *dcl)
      struct sdl2_console *scon = container_of(dcl, struct sdl2_console, dcl);
  
      assert(scon->opengl);
@@ -1096,7 +1123,7 @@ diff --git a/ui/sdl2-gl.c b/ui/sdl2-gl.c
      scon->w = 0;
      scon->h = 0;
      sdl2_set_scanout_mode(scon, false);
-@@ -193,6 +237,9 @@ void sdl2_gl_scanout_texture(DisplayChangeListener *dcl,
+@@ -217,6 +261,9 @@ void sdl2_gl_scanout_texture(DisplayChangeListener *dcl,
      struct sdl2_console *scon = container_of(dcl, struct sdl2_console, dcl);
  
      assert(scon->opengl);
@@ -1106,7 +1133,7 @@ diff --git a/ui/sdl2-gl.c b/ui/sdl2-gl.c
      scon->x = x;
      scon->y = y;
      scon->w = w;
-@@ -213,6 +260,25 @@ void sdl2_gl_scanout_flush(DisplayChangeListener *dcl,
+@@ -237,6 +284,25 @@ void sdl2_gl_scanout_flush(DisplayChangeListener *dcl,
      int ww, wh;
  
      assert(scon->opengl);
@@ -1132,7 +1159,7 @@ diff --git a/ui/sdl2-gl.c b/ui/sdl2-gl.c
      if (!scon->scanout_mode) {
          return;
      }
-@@ -239,6 +305,17 @@ void sdl2_gl_scanout_dmabuf(DisplayChangeListener *dcl,
+@@ -263,6 +329,17 @@ void sdl2_gl_scanout_dmabuf(DisplayChangeListener *dcl,
      assert(scon->opengl);
      SDL_GL_MakeCurrent(scon->real_window, scon->winctx);
  
@@ -1150,7 +1177,7 @@ diff --git a/ui/sdl2-gl.c b/ui/sdl2-gl.c
      egl_dmabuf_import_texture(dmabuf);
      if (!qemu_dmabuf_get_texture(dmabuf)) {
          fds = qemu_dmabuf_get_fds(dmabuf, NULL);
-@@ -262,6 +339,11 @@ void sdl2_gl_scanout_dmabuf(DisplayChangeListener *dcl,
+@@ -286,6 +363,11 @@ void sdl2_gl_scanout_dmabuf(DisplayChangeListener *dcl,
  void sdl2_gl_release_dmabuf(DisplayChangeListener *dcl,
                              QemuDmaBuf *dmabuf)
  {
@@ -1161,3 +1188,4 @@ diff --git a/ui/sdl2-gl.c b/ui/sdl2-gl.c
 +#endif
      egl_dmabuf_release_texture(dmabuf);
  }
+ 
