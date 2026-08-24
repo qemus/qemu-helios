@@ -344,5 +344,5 @@ Special thanks to [TibixDev](https://github.com/TibixDev) and the [WinBoat](http
 [release_url]: https://github.com/qemus/qemu-helios/releases/
 
 [Build]: https://github.com/qemus/qemu-helios/actions/workflows/build.yml/badge.svg
-[Size]: https://img.shields.io/badge/size-18.4_MB-steelblue?style=flat&color=066da5
+[Size]: https://img.shields.io/badge/size-29.2_MB-steelblue?style=flat&color=066da5
 [Version]: https://img.shields.io/github/v/tag/qemus/qemu-helios?label=version&sort=semver&color=066da5
