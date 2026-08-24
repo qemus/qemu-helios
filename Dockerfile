@@ -6,7 +6,6 @@ ARG VERSION_ARG="0.0.0"
 ARG QEMU_VERSION="11.1.0"
 
 ARG QEMU_REF="84f07211cc5b4fc6a371559bf8a5de4fb068e648"
-ARG VIRGL_REF="7fcfce49616974dc7050fdbfb5bb915f4448d270"
 
 ARG DEBIAN_FRONTEND="noninteractive"
 
@@ -25,15 +24,30 @@ EOF_BUILD_DEPS
 
 WORKDIR /src
 
+# Track qemu-render master directly during development. BuildKit resolves the
+# branch head as part of this Git input, so a new qemu-render commit invalidates
+# the virglrenderer build layer below.
+ADD --keep-git-dir=true https://github.com/qemus/qemu-render.git#master /src/qemu-render
+
 # Helios scanout code uses virglrenderer's extended resource metadata API.
-# Build against the exact virglrenderer API used by qemu-render so that support
-# cannot silently compile out when Debian ships older development headers.
+# Build against the exact virglrenderer revision selected by the latest
+# qemu-render master so the two projects stay on the same API automatically.
 RUN <<EOF_VIRGL
   set -eu
 
+  qemu_render_commit="$(git -C qemu-render rev-parse HEAD)"
+  virgl_ref="$(sed -n 's/^ARG VIRGL_REF="\([0-9a-f]\{40\}\)"$/\1/p' qemu-render/Dockerfile)"
+  if [ -z "$virgl_ref" ]; then
+    echo "FAIL: could not resolve VIRGL_REF from qemu-render Dockerfile."
+    exit 1
+  fi
+
+  echo "Using qemu-render commit $qemu_render_commit"
+  echo "Using qemu-render virglrenderer commit $virgl_ref"
+
   git init virglrenderer
   git -C virglrenderer remote add origin https://gitlab.freedesktop.org/virgl/virglrenderer.git
-  git -C virglrenderer fetch --depth=1 origin "${VIRGL_REF}"
+  git -C virglrenderer fetch --depth=1 origin "$virgl_ref"
   git -C virglrenderer checkout --detach FETCH_HEAD
 
   multiarch="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
