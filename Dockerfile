@@ -6,8 +6,6 @@ ARG VERSION_ARG="0.0.0"
 ARG QEMU_VERSION="11.1.0"
 
 ARG QEMU_REF="84f07211cc5b4fc6a371559bf8a5de4fb068e648"
-ARG VMVGA_REF="7c13f144f4e2a2ad616c501397e0b7f6f04eb0aa"
-ARG VIRGL_REF="7fcfce49616974dc7050fdbfb5bb915f4448d270"
 
 ARG DEBIAN_FRONTEND="noninteractive"
 
@@ -26,15 +24,30 @@ EOF_BUILD_DEPS
 
 WORKDIR /src
 
+# Track qemu-render master directly during development. BuildKit resolves the
+# branch head as part of this Git input, so a new qemu-render commit invalidates
+# the virglrenderer build layer below.
+ADD --keep-git-dir=true https://github.com/qemus/qemu-render.git#master /src/qemu-render
+
 # Helios scanout code uses virglrenderer's extended resource metadata API.
-# Build against the exact virglrenderer API used by qemu-render so that support
-# cannot silently compile out when Debian ships older development headers.
+# Build against the exact virglrenderer revision selected by the latest
+# qemu-render master so the two projects stay on the same API automatically.
 RUN <<EOF_VIRGL
   set -eu
 
+  qemu_render_commit="$(git -C qemu-render rev-parse HEAD)"
+  virgl_ref="$(sed -n 's/^ARG VIRGL_REF="\([0-9a-f]\{40\}\)"$/\1/p' qemu-render/Dockerfile)"
+  if [ -z "$virgl_ref" ]; then
+    echo "FAIL: could not resolve VIRGL_REF from qemu-render Dockerfile."
+    exit 1
+  fi
+
+  echo "Using qemu-render commit $qemu_render_commit"
+  echo "Using qemu-render virglrenderer commit $virgl_ref"
+
   git init virglrenderer
   git -C virglrenderer remote add origin https://gitlab.freedesktop.org/virgl/virglrenderer.git
-  git -C virglrenderer fetch --depth=1 origin "${VIRGL_REF}"
+  git -C virglrenderer fetch --depth=1 origin "$virgl_ref"
   git -C virglrenderer checkout --detach FETCH_HEAD
 
   multiarch="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
@@ -55,6 +68,11 @@ RUN <<EOF_VIRGL
   ldconfig
 EOF_VIRGL
 
+# Track qemu-vmvga master directly during development. Because this is a Git
+# ADD input, BuildKit resolves the branch head as part of the build input and a
+# new qemu-vmvga commit invalidates this layer and the QEMU build layers below.
+ADD --keep-git-dir=true https://github.com/qemus/qemu-vmvga.git#master /src/qemu-vmvga
+
 RUN <<EOF_SOURCE
   set -eu
 
@@ -69,19 +87,11 @@ RUN <<EOF_SOURCE
     exit 1
   fi
 
-  # Overlay the pinned enhanced VMware SVGA II implementation onto the same
+  # Overlay the latest enhanced VMware SVGA II implementation onto the same
   # QEMU 11.1 source tree that contains the Helios integration. qemu-vmvga is
   # source-only: its vmware_vga.c and VMware headers are compiled by QEMU.
-  git init qemu-vmvga
-  git -C qemu-vmvga remote add origin https://github.com/qemus/qemu-vmvga.git
-  git -C qemu-vmvga fetch --depth=1 origin "${VMVGA_REF}"
-  git -C qemu-vmvga checkout --detach FETCH_HEAD
-
   actual="$(git -C qemu-vmvga rev-parse HEAD)"
-  if [ "$actual" != "${VMVGA_REF}" ]; then
-    echo "FAIL: qemu-vmvga resolved to $actual instead of ${VMVGA_REF}."
-    exit 1
-  fi
+  echo "Using qemu-vmvga commit $actual"
 
   vmvga_source="qemu-vmvga/hw/display"
   qemu_display="qemu/hw/display"
@@ -91,10 +101,10 @@ RUN <<EOF_SOURCE
   test -d "$vmvga_source/include"
 
   install -m 0644 "$vmvga_source/vmware_vga.c" "$qemu_display/vmware_vga.c"
-  install -m 0644 "$vmvga_source/vmware_vga_compat.c" "$qemu_display/vmware_vga_compat.c"
-
   mkdir -p "$qemu_display/include"
   cp -a "$vmvga_source/include/." "$qemu_display/include/"
+
+  git -C qemu diff --check -- hw/display/vmware_vga.c
 
   # A git tag checkout does not contain Meson wrap sources. Prefetch the
   # subprojects required by the system UI and TCG test configuration so the
