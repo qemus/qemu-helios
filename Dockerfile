@@ -6,6 +6,7 @@ ARG VERSION_ARG="0.0.0"
 ARG QEMU_VERSION="11.1.0"
 
 ARG QEMU_REF="84f07211cc5b4fc6a371559bf8a5de4fb068e648"
+ARG VMVGA_REF="7c13f144f4e2a2ad616c501397e0b7f6f04eb0aa"
 ARG VIRGL_REF="7fcfce49616974dc7050fdbfb5bb915f4448d270"
 
 ARG DEBIAN_FRONTEND="noninteractive"
@@ -86,6 +87,31 @@ RUN <<EOF_SOURCE
     echo "FAIL: QEMU v${QEMU_VERSION} resolved to $actual instead of ${QEMU_REF}."
     exit 1
   fi
+
+  # Overlay the pinned enhanced VMware SVGA II implementation onto the same
+  # QEMU 11.1 source tree that contains the Helios integration. qemu-vmvga is
+  # source-only: its vmware_vga.c and VMware headers are compiled by QEMU.
+  git init qemu-vmvga
+  git -C qemu-vmvga remote add origin https://github.com/qemus/qemu-vmvga.git
+  git -C qemu-vmvga fetch --depth=1 origin "${VMVGA_REF}"
+  git -C qemu-vmvga checkout --detach FETCH_HEAD
+
+  actual="$(git -C qemu-vmvga rev-parse HEAD)"
+  if [ "$actual" != "${VMVGA_REF}" ]; then
+    echo "FAIL: qemu-vmvga resolved to $actual instead of ${VMVGA_REF}."
+    exit 1
+  fi
+
+  vmvga_source="qemu-vmvga/hw/display"
+  qemu_display="qemu/hw/display"
+
+  test -f "$qemu_display/vmware_vga.c"
+  test -f "$vmvga_source/vmware_vga.c"
+  test -d "$vmvga_source/include"
+
+  install -m 0644 "$vmvga_source/vmware_vga.c" "$qemu_display/vmware_vga.c"
+  mkdir -p "$qemu_display/include"
+  cp -a "$vmvga_source/include/." "$qemu_display/include/"
 
   # A git tag checkout does not contain Meson wrap sources. Prefetch the
   # subprojects required by the system UI and TCG test configuration so the
@@ -240,6 +266,11 @@ RUN <<'EOF_BUILD'
       exit 1
     }
   done
+
+  strings /out/qemu-system-x86_64 | grep -Fq 'enhanced BAR1 dirty scanout active' || {
+    echo "FAIL: enhanced qemu-vmvga implementation is missing from the built QEMU binary."
+    exit 1
+  }
 EOF_BUILD
 
 # Test the produced executable inside the actual qemux/qemu runtime image.
