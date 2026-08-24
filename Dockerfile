@@ -147,11 +147,13 @@ RUN <<'EOF_BUILD'
     --audio-drv-list=alsa,oss \
     --disable-blkio \
     --disable-bzip2 \
+    --disable-cocoa \
     --disable-containers \
     --disable-curl \
     --disable-docs \
     --disable-download \
     --disable-gtk \
+    --disable-hvf \
     --disable-install-blobs \
     --disable-jack \
     --disable-libiscsi \
