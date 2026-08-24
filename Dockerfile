@@ -275,7 +275,6 @@ RUN <<'EOF_VERIFY'
     "$binary" -device qxl-vga,help >/tmp/qxl-help 2>&1
 
   install -Dm755 "$binary" /out/qemu-system-x86_64
-  install -Dm644 /tmp/COPYING /out/COPYING
 
   size="$(stat -c %s /out/qemu-system-x86_64)"
   echo "Verified qemu-system-x86_64 (${size} bytes)"
