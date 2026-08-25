@@ -6,7 +6,8 @@
 [![Size]][release_url]
 
 </div></h1>
-Custom QEMU build with [Helios(https://github.com/winboat-org/helios) support for hardware-accelerated Windows graphics.
+
+Custom QEMU build with [Helios](https://github.com/winboat-org/helios) support for hardware-accelerated Windows graphics.
 
 ## What is Helios? ☀️
 
