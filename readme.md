@@ -1,4 +1,4 @@
-<h1 align="center">Helios<br />
+<h1 align="center">QEMU Helios<br />
 <div align="center">
   
 [![Build]][build_url]
@@ -7,11 +7,11 @@
 
 </div></h1>
 
-Custom QEMU build with patches for accelerated Windows graphics.
+Custom QEMU build for accelerated Windows graphics via [Helios](https://github.com/winboat-org/helios).
 
 ## What is Helios? ☀️
 
-Helios is a paravirtualized graphics stack that allows a Windows virtual machine to use the host GPU for hardware-accelerated graphics without passing the physical GPU through to the guest.
+[Helios](https://github.com/winboat-org/helios) is a paravirtualized graphics stack that allows a Windows virtual machine to use the host GPU for hardware-accelerated graphics without passing the physical GPU through to the guest.
 
 Traditional GPU passthrough gives the Windows guest direct ownership of a physical GPU. The normal vendor driver is then installed inside Windows and applications interact with essentially the same GPU stack they would use on bare metal. This provides excellent compatibility, but the GPU generally becomes dedicated to that VM while it is running.
 
@@ -342,7 +342,7 @@ This build also includes an enhanced [QEMU VMVGA](https://github.com/qemus/qemu-
 
 ## Acknowledgements 🙏
 
-Special thanks to [TibixDev](https://github.com/TibixDev) and the [WinBoat](https://github.com/winboat-org/winboat) team, this project would not exist without their invaluable work.
+Special thanks to [TibixDev](https://github.com/TibixDev), [Rupansh](https://github.com/rupansh) and all others from the [WinBoat](https://github.com/winboat-org/winboat) team, this project would not exist without their invaluable work.
 
 [build_url]: https://github.com/qemus/qemu-helios/
 [release_url]: https://github.com/qemus/qemu-helios/releases/
