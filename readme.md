@@ -338,7 +338,7 @@ Improves VNC's handling of rapidly changing lossy regions by coalescing damage m
 
 ## VMware SVGA II support 🖥️
 
-This build also includes an enhanced [SVGA](https://github.com/qemus/qemu-vmvga) implementation to improve performance for Windows NT 5.x guests as they do not support GPU acceleration via Helios. It replaces QEMU's standard `vmware-svga` display-device source with broader VMware SVGA register, FIFO command, capability, cursor and display support.
+This build also includes an enhanced [SVGA](https://github.com/qemus/qemu-vmvga) implementation to improve performance for Windows XP and below, as they do not support GPU acceleration via Helios. It replaces QEMU's standard `vmware-svga` display-device source with broader VMware SVGA register, FIFO command, capability, cursor and display support.
 
 ## Acknowledgements 🙏
 
