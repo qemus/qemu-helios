@@ -3,8 +3,8 @@
 FROM registry.gitlab.com/qemu-project/qemu/qemu/debian:latest AS builder
 
 ARG VERSION_ARG="0.0.0"
-ARG QEMU_VERSION="11.1.0"
 
+ARG QEMU_VERSION="11.1.0"
 ARG QEMU_REF="84f07211cc5b4fc6a371559bf8a5de4fb068e648"
 
 ARG DEBIAN_FRONTEND="noninteractive"
@@ -24,10 +24,7 @@ EOF_BUILD_DEPS
 
 WORKDIR /src
 
-# Track qemu-render master directly during development. BuildKit resolves the
-# branch head as part of this Git input, so a new qemu-render commit invalidates
-# the virglrenderer build layer below.
-ADD --keep-git-dir=true https://github.com/qemus/qemu-render.git#master /src/qemu-render
+ADD --keep-git-dir=true https://github.com/qemus/qemu-render.git#v1.2.0 /src/qemu-render
 
 # Helios scanout code uses virglrenderer's extended resource metadata API.
 # Build against the exact virglrenderer revision selected by the latest
@@ -68,9 +65,6 @@ RUN <<EOF_VIRGL
   ldconfig
 EOF_VIRGL
 
-# Track qemu-vmvga master directly during development. Because this is a Git
-# ADD input, BuildKit resolves the branch head as part of the build input and a
-# new qemu-vmvga commit invalidates this layer and the QEMU build layers below.
 ADD --keep-git-dir=true https://github.com/qemus/qemu-vmvga.git#master /src/qemu-vmvga
 
 RUN <<EOF_SOURCE
