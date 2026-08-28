@@ -87,18 +87,12 @@ RUN <<EOF_SOURCE
   actual="$(git -C qemu-vmvga rev-parse HEAD)"
   echo "Using qemu-vmvga commit $actual"
 
-  vmvga_source="qemu-vmvga/hw/display"
   qemu_display="qemu/hw/display"
+  vmvga_source="qemu-vmvga/hw/display"
 
-  test -f "$qemu_display/vmware_vga.c"
-  test -f "$vmvga_source/vmware_vga.c"
-  test -d "$vmvga_source/include"
-
-  install -m 0644 "$vmvga_source/vmware_vga.c" "$qemu_display/vmware_vga.c"
+  cp -a "$vmvga_source/*.c" "$qemu_display/"
   mkdir -p "$qemu_display/include"
   cp -a "$vmvga_source/include/." "$qemu_display/include/"
-
-  git -C qemu diff --check -- hw/display/vmware_vga.c
 
   # A git tag checkout does not contain Meson wrap sources. Prefetch the
   # subprojects required by the system UI and TCG test configuration so the
