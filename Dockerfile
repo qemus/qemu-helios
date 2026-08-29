@@ -16,7 +16,6 @@ RUN <<EOF_BUILD_DEPS
   apt-get install --no-install-recommends -y \
     dpkg-dev \
     libvulkan-dev \
-    libdxvk-native-dev \
     python3-mako \
     python3-yaml
 
