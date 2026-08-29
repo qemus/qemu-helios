@@ -90,9 +90,7 @@ RUN <<EOF_SOURCE
   qemu_display="qemu/hw/display"
   vmvga_source="qemu-vmvga/hw/display"
 
-  cp -a "$vmvga_source"/*.c "$qemu_display/"
-  mkdir -p "$qemu_display/include"
-  cp -a "$vmvga_source/include/." "$qemu_display/include/"
+  cp -a "$vmvga_source/." "$qemu_display/"
 
   # A git tag checkout does not contain Meson wrap sources. Prefetch the
   # subprojects required by the system UI and TCG test configuration so the
