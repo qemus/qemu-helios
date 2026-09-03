@@ -338,7 +338,7 @@ Improves VNC's handling of rapidly changing lossy regions by coalescing damage m
 
 ## VMware SVGA II support 🖥️
 
-This build also includes an enhanced [SVGA](https://github.com/qemus/qemu-vmvga) implementation to support hardware acceleration for any version below Windows 10, as there is no Helios driver for them. It adds a `vmware-svga` device with 2D acceleration and Direct3D support, and can be used with the official VMWare display drivers.
+This build also includes an enhanced [SVGA](https://github.com/qemus/qemu-vmvga) implementation to support hardware acceleration on legacy Windows versions. It adds a `vmware-svga` device with 2D acceleration and Direct3D support, and can be used with the official VMWare display drivers.
 
 ## Acknowledgements 🙏
 
