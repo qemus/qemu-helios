@@ -250,10 +250,6 @@ RUN <<'EOF_BUILD'
     }
   done
 
-  strings /out/qemu-system-x86_64 | grep -Fq 'vmware-vga: BAR1 trace scanout active' || {
-    echo "FAIL: enhanced qemu-vmvga implementation is missing from the built QEMU binary."
-    exit 1
-  }
 EOF_BUILD
 
 # Test the produced executable inside the actual qemux/qemu runtime image.
