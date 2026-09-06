@@ -65,8 +65,6 @@ RUN <<EOF_VIRGL
   ldconfig
 EOF_VIRGL
 
-ADD --keep-git-dir=true https://github.com/qemus/qemu-vmvga.git#master /src/qemu-vmvga
-
 RUN <<EOF_SOURCE
   set -eu
 
@@ -80,17 +78,6 @@ RUN <<EOF_SOURCE
     echo "FAIL: QEMU v${QEMU_VERSION} resolved to $actual instead of ${QEMU_REF}."
     exit 1
   fi
-
-  # Overlay the latest enhanced VMware SVGA II implementation onto the same
-  # QEMU 11.1 source tree that contains the Helios integration. qemu-vmvga is
-  # source-only: its vmware_vga.c and VMware headers are compiled by QEMU.
-  actual="$(git -C qemu-vmvga rev-parse HEAD)"
-  echo "Using qemu-vmvga commit $actual"
-
-  qemu_display="qemu/hw/display"
-  vmvga_source="qemu-vmvga/hw/display"
-
-  cp -a "$vmvga_source/." "$qemu_display/"
 
   # A git tag checkout does not contain Meson wrap sources. Prefetch the
   # subprojects required by the system UI and TCG test configuration so the
