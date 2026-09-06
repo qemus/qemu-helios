@@ -336,10 +336,6 @@ The patched `egl-headless` path therefore continues capturing the latest GPU sta
 
 Improves VNC's handling of rapidly changing lossy regions by coalescing damage more effectively instead of repeatedly encoding redundant intermediate updates.
 
-## VMware SVGA II support 🖥️
-
-This build also includes an enhanced [SVGA](https://github.com/qemus/qemu-vmvga) implementation to support hardware acceleration on legacy Windows versions. It adds a `vmware-svga` device with 2D acceleration and Direct3D support, and can be used with the official VMWare display drivers.
-
 ## Acknowledgements 🙏
 
 Special thanks to [TibixDev](https://github.com/TibixDev), [Rupansh](https://github.com/rupansh) and all others from the [WinBoat](https://github.com/winboat-org/winboat) team, this project would not exist without their invaluable work.
