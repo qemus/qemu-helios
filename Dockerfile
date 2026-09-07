@@ -139,6 +139,7 @@ RUN <<'EOF_BUILD'
     --extra-ldflags="$extra_ldflags" \
     --audio-drv-list=alsa,oss \
     --disable-af-xdp \
+    --disable-blkio \
     --disable-brlapi \
     --disable-cocoa \
     --disable-containers \
@@ -167,7 +168,6 @@ RUN <<'EOF_BUILD'
     --disable-xen \
     --disable-xkbcommon \
     --enable-attr \
-    --enable-blkio \
     --enable-bpf \
     --enable-bzip2 \
     --enable-cap-ng \
