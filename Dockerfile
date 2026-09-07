@@ -15,7 +15,6 @@ RUN <<EOF_BUILD_DEPS
   apt-get update
   apt-get install --no-install-recommends -y \
     dpkg-dev \
-    libbz2-dev \
     libvulkan-dev \
     python3-mako \
     python3-yaml
@@ -141,6 +140,7 @@ RUN <<'EOF_BUILD'
     --disable-af-xdp \
     --disable-blkio \
     --disable-brlapi \
+    --disable-bzip2 \
     --disable-cocoa \
     --disable-containers \
     --disable-curl \
@@ -174,7 +174,6 @@ RUN <<'EOF_BUILD'
     --disable-xkbcommon \
     --enable-attr \
     --enable-bpf \
-    --enable-bzip2 \
     --enable-cap-ng \
     --enable-capstone \
     --enable-curses \
