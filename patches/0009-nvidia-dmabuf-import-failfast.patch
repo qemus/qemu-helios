@@ -1,6 +1,81 @@
 diff --git a/ui/egl-headless.c b/ui/egl-headless.c
 --- a/ui/egl-headless.c
 +++ b/ui/egl-headless.c
+@@ -349,74 +349,6 @@ static bool egl_dmabuf_linear_span_fits_fd(QemuDmaBuf *dmabuf)
+     return true;
+ }
+ 
+-static bool egl_cpu_dmabuf_map(egl_dpy *edpy, QemuDmaBuf *dmabuf)
+-{
+-    const int *fds;
+-    const uint32_t *offsets;
+-    const uint32_t *strides;
+-    uint32_t width, height, fourcc;
+-    uint64_t modifier;
+-    uint64_t required;
+-    void *map;
+-    int nfds, noffsets, nstrides;
+-    int64_t start_ns;
+-
+-    egl_cpu_dmabuf_unmap(edpy);
+-
+-    if (qemu_dmabuf_get_num_planes(dmabuf) != 1) {
+-        return false;
+-    }
+-
+-    fourcc = qemu_dmabuf_get_fourcc(dmabuf);
+-    if (fourcc != DRM_FORMAT_XRGB8888 && fourcc != DRM_FORMAT_ARGB8888) {
+-        return false;
+-    }
+-
+-    modifier = qemu_dmabuf_get_modifier(dmabuf);
+-    if (modifier != DRM_FORMAT_MOD_INVALID &&
+-        modifier != DRM_FORMAT_MOD_LINEAR) {
+-        return false;
+-    }
+-
+-    fds = qemu_dmabuf_get_fds(dmabuf, &nfds);
+-    offsets = qemu_dmabuf_get_offsets(dmabuf, &noffsets);
+-    strides = qemu_dmabuf_get_strides(dmabuf, &nstrides);
+-    width = qemu_dmabuf_get_backing_width(dmabuf);
+-    height = qemu_dmabuf_get_backing_height(dmabuf);
+-
+-    if (nfds < 1 || noffsets < 1 || nstrides < 1 || fds[0] < 0 ||
+-        !width || !height || strides[0] < width * 4u) {
+-        return false;
+-    }
+-
+-    required = (uint64_t)offsets[0] + (uint64_t)strides[0] * height;
+-    if (required > SIZE_MAX) {
+-        return false;
+-    }
+-
+-    start_ns = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
+-    map = mmap(NULL, required, PROT_READ, MAP_SHARED, fds[0], 0);
+-    if (map == MAP_FAILED) {
+-        error_report("egl-headless: DMA-BUF mmap failed: %s",
+-                     strerror(errno));
+-        return false;
+-    }
+-
+-    edpy->cpu_dmabuf = dmabuf;
+-    edpy->cpu_map = map;
+-    edpy->cpu_map_len = required;
+-    edpy->cpu_offset = offsets[0];
+-    edpy->cpu_stride = strides[0];
+-    edpy->cpu_flushes = 0;
+-    edpy->cpu_sync_state = 0;
+-
+-    error_report("egl-headless: mapped DMA-BUF %ux%u fourcc=0x%08x "
+-                 "stride=%u offset=%u in %.3f ms",
+-                 width, height, fourcc, strides[0], offsets[0],
+-                 (qemu_clock_get_ns(QEMU_CLOCK_REALTIME) - start_ns) / 1e6);
+-    return true;
+-}
+-
+ static bool egl_cpu_dmabuf_flush(egl_dpy *edpy,
+                                  uint32_t x, uint32_t y,
+                                  uint32_t w, uint32_t h)
 @@ -560,15 +560,15 @@ static void egl_scanout_dmabuf(DisplayChangeListener *dcl,
          egl_vulkan_readback_deactivate(edpy);
      }
