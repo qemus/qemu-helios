@@ -1,0 +1,58 @@
+diff --git a/ui/egl-helpers.c b/ui/egl-helpers.c
+--- a/ui/egl-helpers.c
++++ b/ui/egl-helpers.c
+@@ -1,4 +1,22 @@
+     if (texture != 0) {
++        return;
++    }
++
++    /*
++     * libepoxy aborts the process when an unresolved EGL entry point is
++     * called.  Some NVIDIA container stacks provide a working Vulkan ICD but
++     * no EGL_KHR_image[_base] provider, so treat EGL DMA-BUF import as an
++     * unavailable accelerated path instead of calling the aborting stub.
++     */
++    if ((!epoxy_has_egl_extension(qemu_egl_display, "EGL_KHR_image") &&
++         !epoxy_has_egl_extension(qemu_egl_display, "EGL_KHR_image_base")) ||
++        !epoxy_has_egl_extension(qemu_egl_display,
++                                 "EGL_EXT_image_dma_buf_import") ||
++        (modifier != DRM_FORMAT_MOD_INVALID &&
++         !epoxy_has_egl_extension(
++             qemu_egl_display, "EGL_EXT_image_dma_buf_import_modifiers"))) {
++        error_report("EGL DMA-BUF import unavailable: required EGL image "
++                     "extensions are missing");
+         return;
+     }
+ 
+diff --git a/ui/egl-headless.c b/ui/egl-headless.c
+--- a/ui/egl-headless.c
++++ b/ui/egl-headless.c
+@@ -2,12 +2,14 @@
+     if (qemu_dmabuf_get_modifier(dmabuf) == DRM_FORMAT_MOD_INVALID) {
+         error_report("egl-headless: modifier-less DMA-BUF rejected; refusing "
+                      "implicit LINEAR reinterpretation");
+-        return;
++        error_report("egl-headless: no accelerated scanout path is available");
++        exit(EXIT_FAILURE);
+     }
+ 
+     if (!egl_dmabuf_linear_span_fits_fd(dmabuf)) {
+         error_report("egl-headless: native DMA-BUF layout requires EGL import");
+-        return;
++        error_report("egl-headless: no accelerated scanout path is available");
++        exit(EXIT_FAILURE);
+     }
+ 
+     edpy->vk_readback = egl_vulkan_readback_cache_get(edpy, dmabuf, false);
+@@ -17,8 +19,8 @@
+         return;
+     }
+ 
+-    if (egl_cpu_dmabuf_map(edpy, dmabuf)) {
+-        egl_trace_scanout_bind(dmabuf, NULL, "cpu-mmap");
+-    }
++    error_report("egl-headless: Vulkan and EGL DMA-BUF imports failed; "
++                 "software scanout is disabled");
++    exit(EXIT_FAILURE);
+ #endif
+ }
