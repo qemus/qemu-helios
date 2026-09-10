@@ -236,7 +236,6 @@ HeliosVulkanReadback *helios_vulkan_readback_new(QemuDmaBuf *dmabuf,
     uint32_t queue_family_count = 0;
     uint32_t fourcc, num_planes;
     uint64_t modifier;
-    uint64_t dmabuf_size = 0;
     int nfds;
     int import_fd = -1;
     VkResult result;
@@ -264,13 +263,6 @@ HeliosVulkanReadback *helios_vulkan_readback_new(QemuDmaBuf *dmabuf,
     fds = qemu_dmabuf_get_fds(dmabuf, &nfds);
     if (nfds < 1 || fds[0] < 0) {
         return NULL;
-    }
-
-    if (direct_optimal) {
-        dmabuf_size = qemu_dmabuf_get_allocation_size(dmabuf);
-        if (!dmabuf_size) {
-            return NULL;
-        }
     }
 
     readback = g_new0(HeliosVulkanReadback, 1);
@@ -454,14 +446,14 @@ HeliosVulkanReadback *helios_vulkan_readback_new(QemuDmaBuf *dmabuf,
         }
         vkGetImageMemoryRequirements(readback->device, readback->image,
                                      &image_requirements);
-        if (direct_optimal && image_requirements.size != dmabuf_size) {
-            error_report("vulkan-readback: OPTIMAL DMA-BUF shape mismatch "
-                         "required=%" PRIu64 " fd_size=%" PRIu64,
-                         (uint64_t)image_requirements.size, dmabuf_size);
-            vkDestroyImage(readback->device, readback->image, NULL);
-            readback->image = VK_NULL_HANDLE;
-            continue;
-        }
+        /*
+         * HOST3D blob_size describes the guest-visible resource span, not the
+         * native allocation requirement of an OPTIMAL image.  In particular,
+         * tiled NVIDIA allocations can require more memory than width * height
+         * * bytes_per_pixel.  The Vulkan external-memory import is the
+         * authoritative compatibility check, so do not reject the DMA-BUF by
+         * comparing VkMemoryRequirements::size with QEMU's blob metadata.
+         */
         uint32_t image_memory_type = find_memory_type(
             readback->physical_device,
             image_requirements.memoryTypeBits & fd_properties.memoryTypeBits,
