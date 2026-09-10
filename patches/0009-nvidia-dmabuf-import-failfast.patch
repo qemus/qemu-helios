@@ -1,33 +1,29 @@
-diff --git a/ui/egl-helpers.c b/ui/egl-helpers.c
---- a/ui/egl-helpers.c
-+++ b/ui/egl-helpers.c
-@@ -1,4 +1,22 @@
-     if (texture != 0) {
-+        return;
-+    }
-+
-+    /*
-+     * libepoxy aborts the process when an unresolved EGL entry point is
-+     * called.  Some NVIDIA container stacks provide a working Vulkan ICD but
-+     * no EGL_KHR_image[_base] provider, so treat EGL DMA-BUF import as an
-+     * unavailable accelerated path instead of calling the aborting stub.
-+     */
-+    if ((!epoxy_has_egl_extension(qemu_egl_display, "EGL_KHR_image") &&
-+         !epoxy_has_egl_extension(qemu_egl_display, "EGL_KHR_image_base")) ||
-+        !epoxy_has_egl_extension(qemu_egl_display,
-+                                 "EGL_EXT_image_dma_buf_import") ||
-+        (modifier != DRM_FORMAT_MOD_INVALID &&
-+         !epoxy_has_egl_extension(
-+             qemu_egl_display, "EGL_EXT_image_dma_buf_import_modifiers"))) {
-+        error_report("EGL DMA-BUF import unavailable: required EGL image "
-+                     "extensions are missing");
-         return;
-     }
- 
 diff --git a/ui/egl-headless.c b/ui/egl-headless.c
 --- a/ui/egl-headless.c
 +++ b/ui/egl-headless.c
-@@ -2,12 +2,14 @@
+@@ -560,15 +560,15 @@ static void egl_scanout_dmabuf(DisplayChangeListener *dcl,
+         egl_vulkan_readback_deactivate(edpy);
+     }
+     egl_cpu_dmabuf_unmap(edpy);
+ 
+     /*
+      * A modifier-less Venus image may be the exact DirectOptimal primary.
+-     * Reconstruct that producer VkImage first, but accept it only when its
+-     * driver memory requirement exactly equals the DMA-BUF allocation size.
+-     * A proven LINEAR image will fail this shape check and continue to EGL.
++     * Reconstruct that producer VkImage first and let Vulkan's external-memory
++     * import validate compatibility.  HOST3D blob size is a guest-visible span,
++     * not the native allocation requirement of an OPTIMAL image.
+      */
+     if (qemu_dmabuf_get_modifier(dmabuf) == DRM_FORMAT_MOD_INVALID) {
+         edpy->vk_readback = egl_vulkan_readback_cache_get(edpy, dmabuf, true);
+         if (edpy->vk_readback) {
+             edpy->vk_dmabuf = dmabuf;
+             egl_trace_scanout_bind(dmabuf, edpy->vk_readback, "vk-optimal");
+@@ -611,28 +611,30 @@ static void egl_scanout_dmabuf(DisplayChangeListener *dcl,
+                  qemu_dmabuf_get_modifier(dmabuf));
+ 
+ #ifdef CONFIG_LINUX
      if (qemu_dmabuf_get_modifier(dmabuf) == DRM_FORMAT_MOD_INVALID) {
          error_report("egl-headless: modifier-less DMA-BUF rejected; refusing "
                       "implicit LINEAR reinterpretation");
@@ -44,7 +40,9 @@ diff --git a/ui/egl-headless.c b/ui/egl-headless.c
      }
  
      edpy->vk_readback = egl_vulkan_readback_cache_get(edpy, dmabuf, false);
-@@ -17,8 +19,8 @@
+     if (edpy->vk_readback) {
+         edpy->vk_dmabuf = dmabuf;
+         egl_trace_scanout_bind(dmabuf, edpy->vk_readback, "vk-linear");
          return;
      }
  
@@ -56,3 +54,38 @@ diff --git a/ui/egl-headless.c b/ui/egl-headless.c
 +    exit(EXIT_FAILURE);
  #endif
  }
+ 
+ static void egl_cursor_dmabuf(DisplayChangeListener *dcl,
+diff --git a/ui/egl-helpers.c b/ui/egl-helpers.c
+--- a/ui/egl-helpers.c
++++ b/ui/egl-helpers.c
+@@ -367,11 +367,29 @@ void egl_dmabuf_import_texture(QemuDmaBuf *dmabuf)
+     uint32_t num_planes = qemu_dmabuf_get_num_planes(dmabuf);
+ 
+     if (texture != 0) {
+         return;
+     }
+ 
++    /*
++     * libepoxy aborts the process when an unresolved EGL entry point is
++     * called.  Some NVIDIA container stacks provide a working Vulkan ICD but
++     * no EGL_KHR_image[_base] provider, so treat EGL DMA-BUF import as an
++     * unavailable accelerated path instead of calling the aborting stub.
++     */
++    if ((!epoxy_has_egl_extension(qemu_egl_display, "EGL_KHR_image") &&
++         !epoxy_has_egl_extension(qemu_egl_display, "EGL_KHR_image_base")) ||
++        !epoxy_has_egl_extension(qemu_egl_display,
++                                 "EGL_EXT_image_dma_buf_import") ||
++        (modifier != DRM_FORMAT_MOD_INVALID &&
++         !epoxy_has_egl_extension(
++             qemu_egl_display, "EGL_EXT_image_dma_buf_import_modifiers"))) {
++        error_report("EGL DMA-BUF import unavailable: required EGL image "
++                     "extensions are missing");
++        return;
++    }
++
+     assert(nfds >= num_planes);
+     assert(noffsets >= num_planes);
+     assert(nstrides >= num_planes);
+ 
+     attrs[i++] = EGL_WIDTH;
