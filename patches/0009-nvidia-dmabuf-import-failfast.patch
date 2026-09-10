@@ -59,9 +59,7 @@ diff --git a/ui/egl-headless.c b/ui/egl-headless.c
 diff --git a/ui/egl-helpers.c b/ui/egl-helpers.c
 --- a/ui/egl-helpers.c
 +++ b/ui/egl-helpers.c
-@@ -367,11 +367,29 @@ void egl_dmabuf_import_texture(QemuDmaBuf *dmabuf)
-     uint32_t num_planes = qemu_dmabuf_get_num_planes(dmabuf);
- 
+@@ -370,6 +370,24 @@ void egl_dmabuf_import_texture(QemuDmaBuf *dmabuf)
      if (texture != 0) {
          return;
      }
